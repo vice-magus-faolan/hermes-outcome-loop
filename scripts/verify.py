@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Run repository checks; fail if discovery yields no tests.
+"""Run repository checks; fail if discovery yields no tests or Phase 0 is no-go.
 
-At bootstrap this verifies the project documents. Future implementation must
-extend this command to exercise all plugin, schema and integration acceptance.
+Phase-0 integration requires HERMES_PHASE0_SOURCE and HERMES_PHASE0_PYTHON
+(an already provisioned Hermes dependency venv). Missing prerequisites and
+unsupported required interfaces fail, never skip. This is not plugin acceptance.
 """
 from __future__ import annotations
 

@@ -12,6 +12,7 @@ there is no independent outcome database or scheduler.
 - [Original project handoff](docs/project-handoff.md)
 - [Reviewed MVP constraints](docs/mvp-constraints.md) — governs clarifications to the handoff
 - [Delivery roadmap](docs/roadmap.md)
+- [Phase-0 findings and reproduction](docs/phase-0-findings.md) — current feasibility is NO-GO
 - [Contributor and agent boundaries](AGENTS.md)
 
 The proposed tool surface is `outcome_define`, `outcome_show`, `outcome_observe`,
@@ -24,10 +25,17 @@ Installation instructions and exercised examples will be added after implementat
 python3 scripts/verify.py
 ```
 
-The initial verifier checks the bootstrap documents and discovers the standard-library
-unit test suite. It is not evidence that outcome behavior exists or passes.
-Each implementation must extend this same canonical command to cover its new
-unit, schema, architecture, packaging and disposable-Hermes integration checks.
+The verifier checks the documents, harness safety regressions and a mandatory
+registered-plugin/disposable-board feasibility probe. Set `HERMES_PHASE0_SOURCE`
+to the read-only installed Hermes checkout and `HERMES_PHASE0_PYTHON` to its already
+provisioned dependency venv's `bin/python` (preserve the symlink). Missing runtime
+prerequisites fail, never skip. See the findings for exact reproduction commands.
+
+The current installed public reader omits required native comment IDs, so canonical
+verification deliberately fails the feasibility gate. Evidence collection success
+is not plugin acceptance. No production plugin has been implemented; remaining
+worker/failure/profile probes await a reviewed feasibility decision. Future work
+must extend this same command for schemas, architecture, packaging and integration.
 
 ## Delivery
 
