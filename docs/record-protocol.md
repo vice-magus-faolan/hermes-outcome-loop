@@ -279,6 +279,21 @@ is `overdue`; no known bound is `due_time_unknown`. Only awaiting-observation ca
 have observation overdue attention. Observed cards do not become overdue just because
 an old deadline passed; repeat observation cadence is not part of this protocol.
 
+Timing is total over the admitted calendar-valid UTC range (years 0001–9999) and
+nonnegative schema delay range. Check available calendar range before adding a
+delay; never clamp a derived bound or fabricate a year-10000 timestamp. If a known
+anchor+delay exceeds the representable range, return the separate nonfatal
+`timing_diagnostics: ["derived_due_out_of_range"]`, retaining the anchor source.
+Every representable absolute deadline is earlier than that derived bound, so use
+that deadline normally when present. Without another bound, return `not_due` with
+`due_at: null` and the message `awaiting observation; not_due; derived due time
+outside supported UTC range`: the instant is known to be later than every supported
+UTC clock value, not an unknown anchor. Ordinary/missing/nonapplicable timing has
+an empty `timing_diagnostics` array. These diagnostics do not invalidate persisted
+history, change the outcome state/action or prevent define/retry/readback; all
+admitted records remain readable without narrowing their timestamp schema.
+Formatting of representable due instants always retains the four-digit UTC year.
+
 | State | Action / suggestion |
 | --- | --- |
 | untracked, planned, confirmed | `NO_ACTION_REQUIRED` (confirmed retains residual risks). |

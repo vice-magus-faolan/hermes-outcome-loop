@@ -62,6 +62,13 @@ restart. A done anchor comes only from native completion, never from a caller
 `done` field. Awaiting-observation timing distinguishes unknown, not due, exactly
 due and overdue using the earliest supported bound. Observed cards have
 `not_applicable` due status: an old deadline cannot invent a repeat cadence.
+Calendar range is checked before delay addition. A derived instant beyond year
+9999 adds nonfatal `timing_diagnostics: ["derived_due_out_of_range"]`; an earlier
+absolute deadline still determines timing. Without another bound, `not_due` with
+null `due_at` explicitly means the known instant is outside the supported UTC
+range, not that its anchor is unknown. No clamped/invented timestamp, invalid
+history or predictable post-append read failure is introduced. These admitted
+contracts may be defined and retried normally. See the protocol for exact output.
 
 Define/observe first admit locally, then read and reconstruct. An identical valid
 retry returns `acknowledgment: identical_retry` with no append; observe retries
@@ -115,6 +122,13 @@ conservative complexity auditing of production source.
   completion/due boundary checks; inline schemas and static/dynamic allowlists.
 - `test_outcome_verification.py`: every named production gate must be discovered;
   removing any required gate fails closed.
+- `test_outcome_timing.py`: review regressions for an overflowing external anchor
+  with an earlier deadline and native done-anchor define/readback/retry/fresh reads;
+  all four anchors at the last representable second, zero/maximum delays, explicit
+  upper-bound deadlines, four-digit low years and unknown/nonapplicable controls;
+  an observation still appends/verifies and confirmed remains NO_ACTION_REQUIRED.
+  The specification oracle independently compares elapsed durations, avoiding
+  the same overflow without sharing production timing helpers.
 
 The fake transport is deliberately named and never represented as a native result.
 No outcome test reads the live board. Real production registration, native review/
@@ -130,12 +144,22 @@ The production codec is exercised
 against the reviewed fixtures independently of the oracle module; it does not
 import or call that oracle.
 
-Complexity soft warnings remain on preflight, union topology/evidence/context
+Timing remediation RED/GREEN: new tests against the prior adapter reproduce both
+review findings (`operation_failure` hiding an earlier deadline and
+`write_unverified` after a predictable native-done-anchor append). Range checks
+restore readable define/readback/retry/show/check, preserving native provenance
+and outcome state while reporting the range limitation separately. Upper-bound,
+zero-delay and earlier-deadline controls are required production timing gates.
+
+Complexity soft warnings remain on timing presentation, preflight, union topology/evidence/context
 aggregation, presentation and recursive admission. These small boundary functions
 aggregate all errors or derive a complete view rather than silently short-circuit
 conflicting variants. Permutation, negative, race and limit tests justify the
 branching; no production function exceeds the hard threshold of 15. The conservative
 score counts comprehensions and boolean conditions, not just control-flow branches.
+Timing presentation scores 11: it keeps missing, known, out-of-range and
+nonapplicable timing distinct, with full-range and no-write controls; the actual
+range-checked addition is isolated in a small helper.
 
 ## Residual risks
 

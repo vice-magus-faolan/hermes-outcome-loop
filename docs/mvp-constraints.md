@@ -52,6 +52,12 @@ is pending its own exact-artifact review and downstream production-native accept
 - Free-text `observe_when` is descriptive. Only report overdue when a declared
   absolute deadline or a supported externally supplied anchor is known; otherwise
   state `awaiting observation; due time unknown`. No invented deployment timestamp.
+- Timing arithmetic must remain readable across the full admitted UTC calendar
+  and delay ranges. An anchor+delay beyond year 9999 is reported separately as
+  `derived_due_out_of_range`, never clamped or treated as invalid history. Any
+  absolute deadline wins over that later bound; without one the outcome is not
+  yet due for any supported clock, with null due timestamp and an explicit range
+  message. Missing anchors remain distinct from known out-of-range derived bounds.
 - Evidence maps to criteria. Claims of improvement need a baseline/comparison where
   appropriate. Distinguish a verification check from post-delivery outcome evidence.
 - Prefer evidence pointers and concise summaries. Never automatically read repository

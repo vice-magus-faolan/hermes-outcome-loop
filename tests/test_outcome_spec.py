@@ -299,6 +299,22 @@ class AdmissionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             oracle.due(timing, {"deployment": "2026-02-30T00:00:00Z"}, "2026-10-03T00:00:00Z")
 
+    def test_due_arithmetic_full_calendar_range(self):
+        timing = load("golden.json")["contract"]["timing"]
+        maximum = "9999-12-31T23:59:59Z"
+        anchors = {"deployment": maximum}
+        for delay in (1, 86400, 31536000):
+            with self.subTest(delay=delay):
+                value = dict(timing, delay_seconds=delay)
+                self.assertEqual(oracle.due(value, anchors, maximum), "not_due")
+                self.assertEqual(oracle.due(dict(value, deadline="2026-10-01T00:00:00Z"),
+                                            anchors, "2026-10-03T00:00:00Z"), "overdue")
+                self.assertEqual(oracle.due(dict(value, deadline=maximum), anchors, maximum), "due")
+        self.assertEqual(oracle.due(dict(timing, delay_seconds=0), anchors, maximum), "due")
+        self.assertEqual(oracle.due(timing, {"deployment": "9999-12-30T23:59:59Z"}, maximum), "due")
+        self.assertEqual(oracle.due(timing, anchors, "0001-01-01T00:00:00Z"), "not_due")
+        self.assertEqual(oracle.due(timing, {"deployment": "0001-01-01T00:00:00Z"}, maximum), "overdue")
+
     def test_write_preflight_immutable_contract_retry_and_stale_head(self):
         golden = load("golden.json")
         rows = [oracle.occurrence(golden["contract"]), oracle.occurrence(golden["confirmed"])]

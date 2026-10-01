@@ -431,18 +431,20 @@ def timestamp(value: str) -> datetime:
 
 
 def due(timing: dict, anchors: dict, now: str) -> str:
-    deadlines = []
+    """Compare elapsed durations without constructing an overflowing due date."""
+    current = timestamp(now)
+    lateness = []
     if timing["deadline"]:
-        deadlines.append(timestamp(timing["deadline"]))
+        lateness.append(current - timestamp(timing["deadline"]))
     anchor = anchors.get(timing["anchor"])
     if anchor:
-        deadlines.append(timestamp(anchor) + timedelta(seconds=timing["delay_seconds"]))
-    if not deadlines:
+        lateness.append(current - timestamp(anchor) - timedelta(seconds=timing["delay_seconds"]))
+    if not lateness:
         return "due_time_unknown"
-    current, deadline = timestamp(now), min(deadlines)
-    if current == deadline:
+    latest = max(lateness)
+    if latest == timedelta(0):
         return "due"
-    return "overdue" if current > deadline else "not_due"
+    return "overdue" if latest > timedelta(0) else "not_due"
 
 
 def preflight(record: dict, rows: list[dict], status: str) -> str:

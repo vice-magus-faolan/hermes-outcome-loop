@@ -65,6 +65,14 @@ unit evidence, never production native integration or persisted native API resul
 Whole-history preservation, production restart/multi-profile/disabled behavior and
 supported packaging remain mandatory downstream gates.
 
+Production timing additionally requires `test_outcome_timing.py` through the same
+machine-readable map: both reviewed overflow reproducers, define/readback/retry
+readability, earlier explicit deadlines, all supported anchor sources,
+zero/maximum delays, last-second and full-year-range controls. The separate
+`derived_due_out_of_range` diagnostic must not become an invalid-history error or
+an invented timestamp. The specification has its own elapsed-duration full-range
+regression; it is not substituted for these production tests.
+
 No capability-level isolation claim: Python is not sandboxed. No automatic follow-up,
 hook, scheduler, fleet crawler, database or evidence ingestion may be introduced just
 to satisfy a test. Assertions about native persistence must use actual native reads;

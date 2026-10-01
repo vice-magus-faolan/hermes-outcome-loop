@@ -105,9 +105,23 @@ def native_task(reply: dict, task_id: str) -> tuple[str, str | None]:
     return status, completion_time(task)
 
 
+def delayed_due(anchor: str, delay_seconds: int) -> datetime | None:
+    """Return an exact UTC bound, or None when it is beyond the calendar range.
+
+    Nonnegative schema delays cannot underflow. Compare available range BEFORE
+    addition; an out-of-range bound is later than every supported UTC clock value.
+    """
+    start = records.timestamp(anchor)
+    delay = timedelta(seconds=delay_seconds)
+    if delay > datetime.max - start:
+        return None
+    return start + delay
+
+
 def timing_view(view: dict, completed: str | None, anchors: dict, now: datetime) -> None:
     """Timing only applies to unobserved done delivery, not repeat cadence."""
-    view.update(due_status="not_applicable", due_at=None, anchor_sources={}, timing_message=None)
+    view.update(due_status="not_applicable", due_at=None, anchor_sources={}, timing_message=None,
+                timing_diagnostics=[])
     if view["state"] != "awaiting_observation":
         return
     timing = view["timing"]
@@ -121,14 +135,22 @@ def timing_view(view: dict, completed: str | None, anchors: dict, now: datetime)
         deadlines.append(records.timestamp(timing["deadline"]))
     anchor = timing["anchor"]
     if anchor in known:
-        deadlines.append(records.timestamp(known[anchor]) + timedelta(seconds=timing["delay_seconds"]))
+        derived = delayed_due(known[anchor], timing["delay_seconds"])
+        if derived is None:
+            view["timing_diagnostics"] = ["derived_due_out_of_range"]
+        else:
+            deadlines.append(derived)
         view["anchor_sources"] = {anchor: sources[anchor]}
     if not deadlines:
+        if view["timing_diagnostics"]:
+            view.update(due_status="not_due",
+                        timing_message="awaiting observation; not_due; derived due time outside supported UTC range")
+            return
         view.update(due_status="due_time_unknown", timing_message="awaiting observation; due time unknown")
         return
     deadline = min(deadlines)
     due_status = "due" if now == deadline else ("overdue" if now > deadline else "not_due")
-    view.update(due_status=due_status, due_at=deadline.strftime("%Y-%m-%dT%H:%M:%SZ"),
+    view.update(due_status=due_status, due_at=deadline.isoformat(timespec="seconds") + "Z",
                 timing_message=f"awaiting observation; {due_status}")
 
 
