@@ -4,7 +4,8 @@
 
 Requires HERMES_PHASE0_SOURCE (read-only installed source checkout) and
 HERMES_PHASE0_PYTHON (its already provisioned interpreter). No install/update,
-LLM, gateway, dispatcher, CLI Kanban mutation or private database access occurs.
+external LLM, gateway or private Kanban API occurs. A scripted loopback provider
+drives a real dispatcher worker; data writes still use native tools, not CLI.
 Evidence collection can succeed with feasibility=false; --require-feasible is
 an explicit failing acceptance gate, also exercised by scripts/verify.py.
 """
@@ -40,6 +41,11 @@ def prerequisites() -> tuple[Path, Path]:
         raise RuntimeError("HERMES_PHASE0_SOURCE is not a Hermes source checkout")
     if not interpreter.is_file() or not os.access(interpreter, os.X_OK):
         raise RuntimeError("HERMES_PHASE0_PYTHON is not executable")
+    if sys.platform != "linux" or not Path("/proc/self/stat").is_file():
+        raise RuntimeError("Phase-0 worker cleanup currently requires Linux /proc")
+    scratch = os.environ.get("TMPDIR")
+    if not scratch or not Path(scratch).is_dir():
+        raise RuntimeError("required runtime prerequisite: existing writable TMPDIR")
     return source, interpreter
 
 
@@ -86,6 +92,23 @@ def run_child(command: list[str], base: Path, env: dict[str, str], timeout: floa
                 pipe.close()
 
 
+def cleanup_workers(base: Path) -> None:
+    """Reap detached fixture workers using public spawn-hook cleanup receipts."""
+    receipt = base / "worker-pids.jsonl"
+    if not receipt.exists():
+        return
+    for row in receipt.read_text(encoding="utf-8").splitlines():
+        pid = json.loads(row)["pid"]
+        try:
+            environment = Path(f"/proc/{pid}/environ").read_bytes().split(b"\0")
+            expected = f"HOME={base / 'host-home'}".encode()
+            if expected not in environment or os.getpgid(pid) != pid:
+                continue  # never signal a recycled or non-fixture process
+            os.killpg(pid, signal.SIGKILL)
+        except (FileNotFoundError, ProcessLookupError):
+            pass
+
+
 def collect(debug: bool = False) -> dict:
     """Collect sanitized facts only; destroy every disposable native record."""
     source, interpreter = prerequisites()
@@ -98,9 +121,12 @@ def collect(debug: bool = False) -> dict:
         (profile / "config.yaml").write_text(
             "toolsets: [kanban]\nplugins:\n  enabled: [phase0-probe]\n",
             encoding="utf-8")
-        returncode, stdout, stderr = run_child(
-            [str(interpreter), "-B", str(ROOT / "scripts/phase0_runtime.py"), str(source), str(base)],
-            base, env)
+        try:
+            returncode, stdout, stderr = run_child(
+                [str(interpreter), "-B", str(ROOT / "scripts/phase0_runtime.py"), str(source), str(base)],
+                base, env, timeout=240)
+        finally:
+            cleanup_workers(base)
         if returncode:
             # Do not propagate board snapshots or runtime paths into public output.
             if debug:

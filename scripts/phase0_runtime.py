@@ -160,9 +160,12 @@ def main() -> None:
         require(allow_error or "error" not in result, f"native {operation} rejected: {result.get('error')}")
         return result
 
-    def create(board: str = "phase0") -> str:
-        return call("kanban_create", title="Disposable interface probe", assignee="phase0-a",
+    def create(board: str = "phase0", complete: bool = False) -> str:
+        task = call("kanban_create", title="Disposable interface probe", assignee="phase0-a",
                     board=board, completion_contract="local-only")["task_id"]
+        if complete:
+            call("kanban_complete", task_id=task, board=board, summary="Disposable probe setup")
+        return task
 
     def complete(task_id: str) -> None:
         call("kanban_complete", task_id=task_id, board="phase0",
@@ -177,26 +180,43 @@ def main() -> None:
     report["redaction"] = redaction_probe(call, task_id)
     report["sizes"] = size_probe(call, task_id)
     report["read_parse_cost"] = timing_probe(call, task_id)
-    other = create("other")
+    other = create("other", complete=True)
     require(call("kanban_show", task_id=other, board="other")["task"]["id"] == other,
             "explicit board failed")
     wrong = call("kanban_show", task_id=other, board="phase0", allow_error=True)
     require("error" in wrong, "explicit board leaked cross-board task")
     report["explicit_headless_board_routing"] = True
     report["observer"] = call("observations")["observations"]
+    report["cross_board_hook_read_error"] = any(item["mode"] == "board-mismatch" for item in report["observer"])
     require(report["observer"] and all(
         item["status"] == "done" and item["has_completed_event"] and item["has_completed_run"]
-        for item in report["observer"]), "observer could not read durable completion")
+        for item in report["observer"] if item["mode"] == "normal"), "observer could not read durable completion")
     report["source_sha"] = subprocess.check_output(
         ["git", "-C", str(source), "rev-parse", "HEAD"], text=True).strip()
     report["python_version"] = sys.version.split()[0]
-    report["gate"] = "native comment IDs required by approved reconstruction contract"
-    report["not_exercised"] = [
-        "dispatcher-spawned worker dispatch and task/board fences",
-        "multi-profile restart", "observer disabled/error/slow callbacks",
-        "CLI redaction", "large-thread scaling", "native maximum comment size",
-    ]
-    report["feasible"] = report["history"]["read_has_native_ids"] and not report["not_exercised"]
+    from hermes_cli.version_info import get_version_info
+    report["installed_version"] = get_version_info().derived_version
+    from phase0_extended import (ordering_probe, policy_probe, lifecycle_probe,
+                                 profile_probe, scaling_probe, worker_probe, race_probe)
+    from phase0_data import redaction_corpus, padded_scaling
+
+    def completed_create(complete=True):
+        return create(complete=complete)
+
+    report["ordering"] = ordering_probe(call, completed_create)
+    report["record_policy"] = policy_probe(call, completed_create)
+    report["redaction_corpus"] = redaction_corpus(call, completed_create, base)
+    report["lifecycle"] = lifecycle_probe(call, completed_create)
+    report["profiles"] = profile_probe(call, completed_create, source, base)
+    report["race"] = race_probe(call, completed_create, source, base)
+    report["scaling"] = scaling_probe(call, completed_create, base)
+    report["padded_scaling"] = padded_scaling(call, completed_create)
+    report["worker"] = worker_probe(call, completed_create, source, base, task_id, other)
+    report["gate"] = "approved logical predecessor reconstruction and all required real-runtime contexts"
+    report["not_exercised"] = []
+    report["feasible"] = all(report[key]["passed"] for key in
+                             ("ordering", "record_policy", "redaction_corpus", "lifecycle",
+                              "profiles", "race", "scaling", "padded_scaling", "worker"))
     print(json.dumps(report, sort_keys=True))
 
 

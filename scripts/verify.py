@@ -19,6 +19,9 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def main() -> int:
     """Validate tracked source shapes and run the repository unittest suite."""
+    from phase0_audit import main as audit_phase0
+    if audit_phase0():
+        return 1
     for directory in ("scripts", "tests", "src", "plugin", "hermes_outcome_loop"):
         for path in sorted((ROOT / directory).rglob("*.py")):
             ast.parse(path.read_text(encoding="utf-8"), filename=str(path))

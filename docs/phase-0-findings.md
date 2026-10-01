@@ -1,5 +1,173 @@
 # Phase-0 public-interface findings
 
+## Current continuation — 2026-10-01
+
+**GO to independent Phase-0 review for the approved native-record direction.**
+This is builder-verified feasibility evidence, not reviewer acceptance, production
+implementation, schema approval, publication or pilot authorization. The original
+2026-09-30 NO-GO artifact is retained below as historical evidence. The operator
+amendment changed only the ordering requirement; the resumed probes satisfy the
+remaining required contexts rather than simply removing an assertion.
+
+### Runtime and current official interfaces
+
+The continuation still executes installed Hermes
+`0.21.5+4905.gf42f579`, full source SHA
+`f42f579cf8bac4918ac9599bece71618afadd846`, with its already provisioned
+Python `3.14.7` dependency venv. Read-only Git checks found the installed source
+clean before and after the real CLI worker. No source, shared dependencies, live
+profiles, gateway or integration target was changed.
+
+Current official pages were retrieved on 2026-10-01 using
+`python3 scripts/phase0_docs.py` after the extractor returned 403 errors:
+
+| Public documentation | HTML bytes | SHA-256 receipt |
+| --- | ---: | --- |
+| [Plugin guide](https://hermes-agent.nousresearch.com/docs/developer-guide/plugins) | 530074 | `1da56f8cd7ce2b584aecca3f5322b4cb6799436938885173c0b80b15db191dae` |
+| [Kanban reference](https://hermes-agent.nousresearch.com/docs/user-guide/features/kanban) | 269859 | `92cb526213b1d6429810b6c5cd67f4ddfee824ea271799a3f20eab74d359d436` |
+| [Hooks reference](https://hermes-agent.nousresearch.com/docs/user-guide/features/hooks) | 544750 | `20d31aa6cef06bfb62ca1ad86f6428d3a4b8ee99d2d74fe7b826f9236b128f4a` |
+
+The pages document `ctx.dispatch_tool`, native profile identity, post-commit
+Kanban observers, board isolation and logged/skipped observer exceptions.
+These are current published-document receipts, not an upstream source SHA or
+proof that every documented guarantee holds on the installed version. The
+runtime discrepancies below take precedence over broad documentation wording.
+No Hermes update was performed to reconcile those differences.
+
+### Reproduction and isolation
+
+Use the same explicit `HERMES_PHASE0_SOURCE`, `HERMES_PHASE0_PYTHON` and writable
+`TMPDIR` prerequisites described in the historical reproduction section. Current
+commands are:
+
+```sh
+python3 scripts/phase0_probe.py --require-feasible
+python3 -W error::ResourceWarning -m unittest discover -s tests -p test_phase0.py -k HarnessSafetyTests -v
+python3 -m unittest discover -s tests -p test_phase0_ordering.py -v
+python3 scripts/phase0_audit.py
+python3 scripts/verify.py
+```
+
+The extended harness requires Linux `/proc`, POSIX process groups, a loopback
+HTTP listener, Git, repository Python 3.12+ and the installed dependency venv.
+No package installation, model account or external model endpoint is required.
+Missing prerequisites or unsupported behavior fail, never skip. CI must provision
+these explicit prerequisites; no claim is made about the old bootstrap-only CI.
+
+`phase0_probe.py` allowlists the initial child environment and creates fresh
+HOME/profile/Kanban/scratch roots. Pre-import checks reject ambient worker/DB
+pins, symlink escapes and existing boards. Project plugins are disabled. The
+fixture is loaded by the real PluginManager and calls actual `ctx.dispatch_tool`.
+The real dispatcher supplies worker task/run/DB/profile pins; the harness never
+forges them. A scripted loopback OpenAI-compatible model transport chooses the
+fixture tool in a real `hermes chat -q` worker; it does not replace dispatch,
+native tool handlers, lifecycle hooks or the agent loop. Verdicts come from native
+reads, native attribution and completed runs, not scripted model claims.
+
+The only CLI Kanban operation in the harness is the public dispatcher launch:
+there is no CLI data-write or redaction fallback. The dispatcher uses a disposable
+wrapper pinned to the provisioned interpreter and installed module; supported
+`HERMES_DISABLE_LAZY_INSTALLS=true` prevents launch-time provisioning. Fixture
+configuration uses `platform_toolsets.cli` and disables deferred tool search so
+the scripted model receives the probe tool. An earlier continuation attempt omitted
+that configuration and produced no tool calls; it is not accepted worker evidence.
+
+The public `on_kanban_worker_spawned` hook records disposable cleanup PIDs only.
+The parent keeps the scripted transport alive until worker exit, then performs
+bounded cleanup. Timeout cleanup validates each recorded process's disposable HOME
+and process-group identity before signaling. Files, native records, model request
+bodies and local diagnostics are destroyed with the temporary tree; public reports
+contain only portable measurements and booleans, never snapshots or live coordinates.
+
+`phase0_snapshot.py` opens only the fixed, resolved disposable database with
+SQLite `mode=ro`, solely to compare full native task/run/event/comment history
+and actual stored text against public reads. It neither mutates SQL nor supplies
+IDs/order to reconstruction. The fixture does not import it. Production must not
+import this helper or access the database.
+
+### Go/no-go by handoff prerequisite
+
+| Prerequisite | Current evidence / decision |
+| --- | --- |
+| Installed identity and current official interfaces | GO for the recorded installation and receipts, not future version compatibility. |
+| Native append after done | GO: structured comments append after actual completion; task/run rows and pre-existing events remain intact, with only native `commented` additions. |
+| Complete record bodies and native provenance | GO: full public comments through 1024 records; native author/body/time agree with read-only stored-history comparisons. Native comment IDs remain absent. |
+| Deterministic logical ordering | GO: native JSON roundtrips reconstruct the same unique chain after reversed/rotated input and tied timestamps; identical retries retain each source occurrence. Forks, multiple roots, conflicting same-ID payloads, missing predecessors and cycles return diagnostics and no winner. |
+| Actual concurrent append | GO: two fresh profile processes read one shared predecessor before a test-only barrier releases both native appends. Both authors survive; reconstruction diagnoses a fork, with no winner. No authoritative lock/store is added. |
+| Registered headless and worker dispatch | GO: actual PluginContext dispatch reaches native handlers in library-host and real dispatcher-spawned CLI agent contexts. Worker completion is visible as a native completed run, and worker exit is observed. |
+| Native task and board fences | GO with an explicit adapter admission check: sibling lifecycle completion is refused specifically by the native task-ownership fence; same-board sibling informational comments remain allowed and preserve lifecycle history. Cross-board tasks are unavailable under the native DB pin. |
+| Restart and multi-profile consistency | GO: fresh profile processes reopen the same native history; an identical retry from another profile groups logically while retaining both native authors/times. No hidden process-local outcome state is needed. |
+| Canonical completion and observer exceptions | GO for bounded ordinary exceptions: callbacks freshly see done/completed event/completed run; an intentionally raised callback exception does not undo completion or prevent the later observer. |
+| Disabled observer/plugin | GO: a fresh profile with no fixture enabled completes the task via a native public tool and reads its native completed run. |
+| Slow observer | GO only for post-commit lock release: a 200 ms callback delays the caller, while another thread's native comment append finishes during the callback. Not a callback timeout or process-wide guarantee. |
+| Cross-board completion-hook routing | NO-GO as an authority source on this installation: completing on an explicit second board emits the ambient first-board slug, so the observer's fresh read fails. Omit the optional hook; correctness must use explicitly scoped fresh reads. |
+| Stored redaction and acknowledgment | GO for a guarded/readback path, NO-GO for blind trust in redaction: safe Unicode/quotes roundtrip; token-like summaries/IDs/predecessors change, and an environment assignment can destroy JSON syntax. Changed/unparseable records are not acknowledged as successful. |
+| Credential-like URL admission | Native opaque query-token redaction is NOT provided by this writer. A bounded fixture admission guard rejects the exercised credential-bearing URL before a write. The production ADR must define robust sensitive-evidence rejection rather than copy this small regex as a universal scrubber. |
+| Record length and rejection | GO for bounded experiments: 16 KiB total UTF-8 serialized record roundtrips at the exact boundary; one byte beyond is rejected before mutation. Native 4/16/64 KiB exploratory writes remain exact. Empty/blank and caller-author fields are rejected. The native maximum is deliberately not claimed or needed with an application cap. |
+| Interactive one-thread read/parse cost | GO within measured bounds: fresh read plus causal reconstruction tested at 16/128/512/1024 small records and 128 full-sized records totaling 2 MiB. Record-count and total-byte overflow produce visible diagnostics. Not an SLO or fleet/remote-storage benchmark. |
+| Whole delivery-history preservation | GO: authorized disposable read-only comparisons retain task/run rows and every pre-existing native event/comment beyond the public last-50-event window; exactly 1025 new native comment events are permitted in the count-limit probe. |
+| No forbidden production API required | GO: reconstruction uses public record bodies; production can remain `kanban_show`/`kanban_comment` only, with admission checks and no required hook. No private mutation API, DB ordering workaround or CLI write fallback. |
+
+The envelope names and 16 KiB / 1024-record / 2 MiB experiment bounds are NOT
+approved production schemas or limits. The downstream ADR owns those decisions.
+The observations establish a viable bounded design, not atomic uniqueness or
+automatic fork reconciliation. When native writes alter a record, failure after
+readback does not roll back that append; later reads must expose invalid history,
+never pretend it is untracked. Opaque secrets and encoded/novel credential forms
+cannot be guaranteed absent by regex redaction. Known sensitive inputs should be
+rejected before append; no evidence pointer may be fetched automatically.
+
+### Measured cost and verification
+
+A representative required-gate run exited 0 with `feasible: true` and all required
+probe sections exercised. Fresh-read/causal-parse measurements (10 samples each):
+
+| Thread | Median ms | Maximum ms | Public response bytes |
+| --- | ---: | ---: | ---: |
+| 16 small records | 2.914 | 3.578 | 10598 |
+| 128 small records | 6.022 | 7.289 | 40648 |
+| 512 small records | 14.730 | 16.375 | 122062 |
+| 1024 small records | 24.670 | 62.969 | 230700 |
+| 128 records at 16 KiB each (2 MiB total) | 23.638 | 25.050 | 2179702 |
+
+These are local warm measurements including native tool dispatch and worker-context
+serialization, not performance guarantees. Public reads still materialize the whole
+comment thread before application admission checks; rejecting an over-limit history
+does not cap native read allocation. Do not describe this as a resource sandbox.
+
+The ordinary-error callback completed in 24.622 ms; normal completion in 18.965 ms;
+the intentional 200 ms callback completed in 221.009 ms with its parallel write
+finished. A nonterminating callback can still hang its caller. Omit the optional
+hook to remove this outcome-plugin completion dependency. Python process exit,
+exhaustion and malicious plugin code remain outside the isolation guarantee.
+
+The canonical verifier discovers the expanded unit/native suites and runs the
+conservative AST complexity audit. Maximum harness function score is 14, with
+soft warnings above 10 and failure above 15. Warning functions are explicit
+boundary/diagnostic checks exercised by the native corpus; no >15 exception is used.
+The prior obsolete-ID gate was replaced by mandatory causal/context/record tests,
+not by a skipped integration test or constant feasibility assertion.
+
+Actual continuation checks:
+
+- `python3 scripts/verify.py`: 21 discovered tests passed, exit 0, including
+  mandatory real-runtime worker and record probes.
+- ResourceWarning-as-error harness suite: eight tests passed, exit 0.
+- Causal reconstruction suite: six tests passed, exit 0. A controlled temporary
+  mutation selecting the lexicographically largest ID instead of the causal head
+  made the reordered/tied-time regression fail; restoring the causal logic made
+  it pass. The mutation is not retained in the artifact.
+- Required feasibility CLI: exit 0, `feasible: true`, `not_exercised: []`.
+- Removing both runtime prerequisite variables from canonical verification:
+  exit 1, integration setup error naming `HERMES_PHASE0_SOURCE`, not a skip.
+- Conservative complexity audit: 74 functions, maximum 14; exit 0.
+- `git diff --check`: exit 0. Installed source remains clean and unchanged;
+  integration-target advancement and publication are not part of this work.
+- Official-doc receipts refreshed at `2026-10-01T20:31:38.019778+00:00` match the
+  byte counts and hashes above. Retrieval is explicit, not an offline-suite side effect.
+
+## Historical artifact — 2026-09-30 (unchanged evidence below)
+
 Status of the original 2026-09-30 artifact: **NO-GO under the original approved MVP constraints.**
 
 On 2026-10-01 the operator approved the [logical-ID/predecessor ordering

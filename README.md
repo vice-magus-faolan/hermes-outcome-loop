@@ -1,6 +1,6 @@
 # Hermes Outcome Loop
 
-**Status: bootstrap and Phase-0 reconnaissance. No outcome plugin is implemented or installed yet.**
+**Status: Phase-0 feasibility evidence awaiting independent review. No outcome plugin is implemented or installed yet.**
 
 A small native-Hermes extension for **objective → delivery → observed outcome**.
 Native Hermes Kanban remains the sole execution authority. Outcome contracts and
@@ -12,8 +12,8 @@ there is no independent outcome database or scheduler.
 - [Original project handoff](docs/project-handoff.md)
 - [Reviewed MVP constraints](docs/mvp-constraints.md) — governs clarifications to the handoff
 - [Delivery roadmap](docs/roadmap.md)
-- [Phase-0 findings and reproduction](docs/phase-0-findings.md) — preserved original NO-GO evidence
-- [Approved logical-ordering amendment](docs/decisions/2026-10-01-record-ordering.md) — Phase-0 continuation authorized, remaining feasibility checks pending
+- [Phase-0 findings and reproduction](docs/phase-0-findings.md) — current real-runtime results and preserved original NO-GO evidence
+- [Approved logical-ordering amendment](docs/decisions/2026-10-01-record-ordering.md) — logical predecessor reconstruction, not timestamp ordering
 - [Contributor and agent boundaries](AGENTS.md)
 
 The proposed tool surface is `outcome_define`, `outcome_show`, `outcome_observe`,
@@ -32,14 +32,20 @@ to the read-only installed Hermes checkout and `HERMES_PHASE0_PYTHON` to its alr
 provisioned dependency venv's `bin/python` (preserve the symlink). Missing runtime
 prerequisites fail, never skip. See the findings for exact reproduction commands.
 
-The installed public reader omits native comment IDs. On 2026-10-01 the operator
-approved logical record IDs with explicit predecessor references and visible fork
-or conflict diagnostics instead of native-ID ordering. That direction is recorded
-in the amendment above; it is not feasibility acceptance. The existing canonical
-suite remains red until the resumed Phase-0 worker replaces the obsolete assertion
-with causal-ordering evidence and completes the remaining worker/failure/profile
-probes. No production plugin has been implemented. Future work must extend this
-same command for schemas, architecture, packaging and integration.
+The resumed suite exercises logical predecessor reconstruction, real registered
+plugin dispatch in headless and dispatcher-spawned CLI worker contexts, native
+task/board fences, cross-profile restart and concurrent appends, observer
+error/slow/disabled behavior, stored redaction and bounded history scaling.
+It passes on the recorded installed runtime; independent exact-artifact review
+is still required. The fixture is not a production outcome plugin or approved
+schema. Future work must extend this same command for schemas, architecture,
+packaging and integration. Official-doc receipts can be refreshed explicitly with
+`python3 scripts/phase0_docs.py`; ordinary verification does not fetch evidence.
+
+Important constraints: reject mismatched worker board slugs explicitly, omit the
+optional completion hook, and do not treat native redaction as a universal secret
+scrubber. See the findings for exercised limitations and required admission/readback
+policies. No live installation or publication is authorized by these probes.
 
 ## Delivery
 
