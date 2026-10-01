@@ -4,7 +4,8 @@ Approved bootstrap direction: 2026-09-30. These clarifications take precedence
 where the original handoff is ambiguous. Phase-0 evidence has independent review.
 The [native-record ADR](decisions/2026-10-01-native-record-contract.md),
 [v1 record protocol](record-protocol.md) and [acceptance mapping](acceptance-tests.md)
-now specify implementation decisions, pending their independent exact-artifact review.
+specify independently reviewed implementation decisions. The core implementation
+is pending its own exact-artifact review and downstream production-native acceptance.
 
 ## Authority and failure
 

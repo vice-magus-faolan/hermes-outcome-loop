@@ -2,7 +2,8 @@
 
 Normative companion to the [native-record ADR](decisions/2026-10-01-native-record-contract.md).
 The [JSON schemas](../schemas/) define shape; the rules below define semantics.
-No tools are implemented by this specification milestone.
+The [core source implementation](core-implementation.md) follows this specification;
+production-native integration, packaging and installation remain separate gates.
 
 ## Encoding and admission
 

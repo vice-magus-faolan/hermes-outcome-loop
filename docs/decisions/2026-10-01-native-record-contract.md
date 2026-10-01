@@ -1,7 +1,7 @@
 # ADR: bounded native-record outcome contract
 
-Date: 2026-10-01. Status: **Implementation contract proposed for independent
-exact-artifact review.** Acceptance of this ADR does not deliver a plugin.
+Date: 2026-10-01. Status: **Independently reviewed implementation contract.**
+Acceptance of this ADR does not deliver a plugin.
 
 ## Context
 
@@ -66,9 +66,9 @@ and historical NO-GO evidence remain unchanged.
 `python3 scripts/verify.py` includes schema metaschema/strict-JSON/golden/negative
 checks, contextual fixture oracles, architecture constraints and the mandatory
 real-runtime Phase-0 suite. [Acceptance mapping](../acceptance-tests.md) separates
-this executable specification from required downstream production and native
-integration gates. The oracle is test support, not a registered plugin or proof
-that an unimplemented adapter is safe.
+this executable specification from production core unit/architecture checks and
+required downstream native integration gates. The oracle remains test support,
+not a registered plugin or proof of production native integration.
 
 Concurrent writers can both append; post-write readback may precede a later race.
 A successful response proves only the observed snapshot. Fresh reads expose later

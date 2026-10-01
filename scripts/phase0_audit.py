@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Conservative AST branch audit for feasibility/specification (not a linter)."""
+"""Conservative AST branch audit for feasibility/specification/production (not a linter)."""
 import ast
 from pathlib import Path
 
@@ -24,9 +24,10 @@ def score(node):
 
 
 def results():
-    """Return portable path/function scores for scripts and the fixture."""
+    """Return portable scores for scripts, the fixture and production functions."""
     paths = sorted((ROOT / "scripts").glob("phase0_*.py")) + [
         ROOT / "tests/fixtures/phase0_plugin/__init__.py", ROOT / "scripts/outcome_spec.py"]
+    paths += sorted((ROOT / "hermes_outcome_loop").glob("*.py"))
     return [(str(path.relative_to(ROOT)), node.name, 1 + score(node))
             for path in paths for node in ast.walk(ast.parse(path.read_text()))
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))]

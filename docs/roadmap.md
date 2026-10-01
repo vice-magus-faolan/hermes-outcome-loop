@@ -1,7 +1,8 @@
 # MVP roadmap
 
-Phase 0 has independent exact-artifact review. ADR/schemas are proposed for review;
-production implementation and repository delivery remain pending.
+Phase 0 and ADR/schemas have independent exact-artifact review. The four-tool core
+is implemented and unit-tested, pending its exact-artifact review. Production native
+integration/packaging and repository delivery remain pending.
 
 1. **Phase 0 — public-interface feasibility.** Record installed Hermes version/full
    SHA, public API contracts and actual disposable-board probe results. Prove

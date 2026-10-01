@@ -1,2 +1,2 @@
-# Schema verification only; no production runtime dependency decision.
-jsonschema==4.25.1
+# Verification exercises the exact runtime schema dependencies.
+-r requirements.txt

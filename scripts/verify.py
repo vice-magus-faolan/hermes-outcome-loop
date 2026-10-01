@@ -4,8 +4,9 @@
 
 Phase-0 integration requires HERMES_PHASE0_SOURCE and HERMES_PHASE0_PYTHON
 (an already provisioned Hermes dependency venv). Missing prerequisites and
-unsupported required interfaces fail, never skip. Schema/oracle checks require
-requirements-dev.txt in a repo-local environment. This is not plugin acceptance.
+unsupported required interfaces fail, never skip. Schema/production unit checks
+require requirements-dev.txt in a repo-local environment. Production real-native
+integration remains a separate required downstream gate, not a Phase-0 claim.
 """
 from __future__ import annotations
 
@@ -16,6 +17,25 @@ import sys
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))  # Source package discovery without installing into Hermes.
+
+
+def test_ids(suite):
+    """Flatten discovery without running tests or treating a failed import as coverage."""
+    if isinstance(suite, unittest.TestSuite):
+        return {identifier for child in suite for identifier in test_ids(child)}
+    return {suite.id()}
+
+
+def require_production_gates(identifiers: set[str]) -> None:
+    """Every ADR boundary needs named executable production unit/architecture tests."""
+    mapping = json.loads((ROOT / "tests/fixtures/outcome/production-map.json").read_text())
+    policy = json.loads((ROOT / "schemas/protocol.json").read_text())
+    if set(mapping) != set(policy["acceptance_boundaries"]):
+        raise RuntimeError("incomplete production acceptance map")
+    for boundary, required in mapping.items():
+        if not required or not set(required) <= identifiers:
+            raise RuntimeError(f"missing production acceptance tests: {boundary}")
 
 
 def main() -> int:
@@ -31,6 +51,7 @@ def main() -> int:
     for path in sorted((ROOT / "schemas").rglob("*.json")):
         json.loads(path.read_text(encoding="utf-8"))
     suite = unittest.defaultTestLoader.discover(str(ROOT / "tests"))
+    require_production_gates(test_ids(suite))
     count = suite.countTestCases()
     if count == 0:
         print("ERROR: no tests discovered", file=sys.stderr)

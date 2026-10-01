@@ -44,9 +44,9 @@ packages. Missing schema dependency is an error, never a skipped check. Preserve
 explicit Phase-0 runtime prerequisites described in the findings. Schema meta/format
 validation must be offline; ordinary verification must not fetch docs or evidence.
 
-Architecture checks at this milestone constrain the executable specification's
-imports/effects and the explicit tool/scope allowlist. They do NOT claim an absent
-production adapter has been tested. Downstream must independently implement and test
+The specification milestone's architecture checks constrain the oracle's
+imports/effects and the explicit tool/scope allowlist. They did not test the then
+absent production adapter. Production must independently exercise
 its own parser/adapter against these fixtures, statically AND dynamically constrain
 all native calls to show/comment, and exercise actual registration/native persistence,
 status/fence/read-write-readback failures, concurrent races and disabled/error plugin
@@ -54,12 +54,23 @@ completion. The real disposable integration lane owns whole native-history compa
 restart and multi-profile proof for the production plugin. Existing Phase-0 tests are
 feasibility evidence, not substitutes for those production gates.
 
+The [core implementation](core-implementation.md) now has separate production
+unit/architecture coverage in `tests/test_outcome_core.py`, `test_outcome_adapter.py`,
+`test_outcome_boundaries.py` and `test_outcome_verification.py`. The closed
+[`production-map.json`](../tests/fixtures/outcome/production-map.json) maps every ADR
+boundary to actual test IDs. Canonical verification requires every named gate to
+be discovered; removing one fails closed. These tests exercise the production
+parser/adapter, not the oracle. Simultaneous fake-transport race tests are explicitly
+unit evidence, never production native integration or persisted native API results.
+Whole-history preservation, production restart/multi-profile/disabled behavior and
+supported packaging remain mandatory downstream gates.
+
 No capability-level isolation claim: Python is not sandboxed. No automatic follow-up,
 hook, scheduler, fleet crawler, database or evidence ingestion may be introduced just
 to satisfy a test. Assertions about native persistence must use actual native reads;
 test-oracle output is never presented as a native API result.
 
-## Builder verification evidence
+## Specification builder verification evidence (historical)
 
 - Original proposed artifact: focused 21 tests and canonical 42 tests passed, but
   independent review found three gaps. Passing that narrower suite was insufficient.
