@@ -1,6 +1,6 @@
 # Hermes Outcome Loop
 
-**Status: Phase-0 feasibility evidence awaiting independent review. No outcome plugin is implemented or installed yet.**
+**Status: Phase-0 feasibility independently reviewed; ADR/schemas proposed for exact-artifact review. No outcome plugin is implemented or installed yet.**
 
 A small native-Hermes extension for **objective → delivery → observed outcome**.
 Native Hermes Kanban remains the sole execution authority. Outcome contracts and
@@ -14,6 +14,7 @@ there is no independent outcome database or scheduler.
 - [Delivery roadmap](docs/roadmap.md)
 - [Phase-0 findings and reproduction](docs/phase-0-findings.md) — current real-runtime results and preserved original NO-GO evidence
 - [Approved logical-ordering amendment](docs/decisions/2026-10-01-record-ordering.md) — logical predecessor reconstruction, not timestamp ordering
+- [Native-record ADR](docs/decisions/2026-10-01-native-record-contract.md), [record protocol](docs/record-protocol.md) and [acceptance-to-test map](docs/acceptance-tests.md) — implementation contract, not available tools
 - [Contributor and agent boundaries](AGENTS.md)
 
 The proposed tool surface is `outcome_define`, `outcome_show`, `outcome_observe`,
@@ -23,10 +24,14 @@ Installation instructions and exercised examples will be added after implementat
 ## Verification
 
 ```sh
+python3 -m venv .venv
+. .venv/bin/activate
+python3 -m pip install -r requirements-dev.txt
 python3 scripts/verify.py
 ```
 
-The verifier checks the documents, harness safety regressions and a mandatory
+The verifier checks the documents, closed JSON schemas/golden/negative/contextual
+fixtures, data-only architecture constraints, harness safety regressions and a mandatory
 registered-plugin/disposable-board feasibility probe. Set `HERMES_PHASE0_SOURCE`
 to the read-only installed Hermes checkout and `HERMES_PHASE0_PYTHON` to its already
 provisioned dependency venv's `bin/python` (preserve the symlink). Missing runtime
@@ -36,9 +41,10 @@ The resumed suite exercises logical predecessor reconstruction, real registered
 plugin dispatch in headless and dispatcher-spawned CLI worker contexts, native
 task/board fences, cross-profile restart and concurrent appends, observer
 error/slow/disabled behavior, stored redaction and bounded history scaling.
-It passes on the recorded installed runtime; independent exact-artifact review
-is still required. The fixture is not a production outcome plugin or approved
-schema. Future work must extend this same command for schemas, architecture,
+It passes on the recorded installed runtime and has independent Phase-0 review.
+The Phase-0 fixture is not a production outcome plugin or production schema.
+The new specification oracle has no native dispatch; its checks do not substitute
+for downstream plugin/native acceptance. Future work must extend this same command for production architecture,
 packaging and integration. Official-doc receipts can be refreshed explicitly with
 `python3 scripts/phase0_docs.py`; ordinary verification does not fetch evidence.
 

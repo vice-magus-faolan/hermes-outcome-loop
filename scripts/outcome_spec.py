@@ -1,0 +1,429 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Executable, data-only ADR oracle. NOT a production parser or Kanban adapter.
+
+JSON Schema covers record shape; named checks cover contextual invariants. The
+closed registry never fetches schemas. No native tool or evidence I/O occurs.
+Downstream production tests must exercise their own code against these fixtures.
+"""
+from __future__ import annotations
+
+import ast
+from collections import defaultdict
+import copy
+from datetime import datetime, timedelta
+import hashlib
+import json
+from pathlib import Path
+import re
+from urllib.parse import urlsplit
+
+from jsonschema import Draft202012Validator, FormatChecker
+from referencing import Registry, Resource
+from referencing.exceptions import NoSuchResource
+
+ROOT = Path(__file__).resolve().parents[1]
+POLICY = json.loads((ROOT / "schemas/protocol.json").read_text(encoding="utf-8"))
+MARKER = POLICY["marker"]
+
+
+def no_remote(uri: str):
+    """Unknown references are errors, never network requests."""
+    raise NoSuchResource(ref=uri)
+
+
+def schemas() -> dict:
+    """Load only the three fixed repository schema files."""
+    return {name: json.loads((ROOT / f"schemas/{name}.schema.json").read_text(encoding="utf-8"))
+            for name in ("common", "contract", "observation")}
+
+
+def validators() -> dict:
+    values = schemas()
+    checker = FormatChecker()
+
+    @checker.checks("date-time", raises=ValueError)
+    def utc_seconds(value):
+        if not isinstance(value, str):
+            return True  # Type errors belong to the schema's type constraint.
+        datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ")
+        return True
+
+    registry = Registry(retrieve=no_remote).with_resources(
+        (value["$id"], Resource.from_contents(value)) for value in values.values())
+    return {name: Draft202012Validator(value, registry=registry, format_checker=checker)
+            for name, value in values.items() if name != "common"}
+
+
+VALIDATORS = validators()
+
+
+def check_schemas() -> None:
+    """Validate Draft 2020-12 metaschemas and reject unresolved references."""
+    values = schemas()
+    for value in values.values():
+        Draft202012Validator.check_schema(value)
+    allowed = {value["$id"].rsplit("/", 1)[-1] for value in values.values()}
+    for value in values.values():
+        check_refs(value, allowed)
+
+
+def check_refs(value: object, allowed: set[str]) -> None:
+    if isinstance(value, dict):
+        if "$ref" in value:
+            target = value["$ref"].split("#", 1)[0]
+            if target and target not in allowed:
+                raise ValueError("nonlocal_schema_reference")
+        for child in value.values():
+            check_refs(child, allowed)
+    elif isinstance(value, list):
+        for child in value:
+            check_refs(child, allowed)
+
+
+def admit_text(text: str) -> None:
+    """Reject known secrets/unsafe pointers, not claim universal secret detection."""
+    text.encode("utf-8", errors="strict")
+    if any(ord(character) < 32 for character in text):
+        raise ValueError("control_character")
+    sensitive = r"(?i)(?:\b(?:[a-z_]*api[_-]?key|[a-z_]*token|password|secret)\s*[:=]|\bbearer\s|-----BEGIN .*PRIVATE KEY-----|\[REDACTED\]|\b(?:sk-|ghp_|github_pat_)[A-Za-z0-9_-]+)"
+    if re.search(sensitive, text):
+        raise ValueError("sensitive_input")
+    for url in re.findall(r"[A-Za-z][A-Za-z0-9+.-]*://[^\s]+", text):
+        parsed = urlsplit(url)
+        if parsed.scheme != "https" or parsed.username or parsed.query or parsed.fragment:
+            raise ValueError("unsafe_pointer")
+        if not re.fullmatch(schemas()["common"]["$defs"]["pointer"]["pattern"], url):
+            raise ValueError("unsafe_pointer")
+
+
+def admit_values(value: object, depth: int = 0) -> None:
+    if depth > 12:
+        raise ValueError("nesting_limit")
+    if isinstance(value, str):
+        admit_text(value)
+    elif isinstance(value, dict):
+        for key, child in value.items():
+            admit_text(key)
+            admit_values(child, depth + 1)
+    elif isinstance(value, list):
+        for child in value:
+            admit_values(child, depth + 1)
+    elif isinstance(value, float):
+        raise ValueError("noninteger_number")
+
+
+def validate(record: dict) -> None:
+    if not isinstance(record, dict) or record.get("type") not in VALIDATORS:
+        raise ValueError("malformed_record")
+    if type(record.get("version")) is not int or record["version"] != 1:
+        raise ValueError("unsupported_version")
+    errors = list(VALIDATORS[record["type"]].iter_errors(record))
+    if errors:
+        raise ValueError("malformed_record")
+    admit_values(record)
+    if seal(record)["payload_sha256"] != record["payload_sha256"]:
+        raise ValueError("integrity_mismatch")
+    if record["type"] == "contract":
+        ids = [criterion["id"] for criterion in record["criteria"]]
+        if len(ids) != len(set(ids)):
+            raise ValueError("duplicate_criterion")
+
+
+def payload_json(record: dict) -> str:
+    return json.dumps(record, ensure_ascii=False, sort_keys=True,
+                      separators=(",", ":"), allow_nan=False)
+
+
+def seal(record: dict) -> dict:
+    """Generate a corruption checksum, not an identity or authentication token."""
+    value = copy.deepcopy(record)
+    value.pop("payload_sha256", None)
+    checksum = hashlib.sha256(payload_json(value).encode("utf-8")).hexdigest()
+    value["payload_sha256"] = checksum
+    return value
+
+
+def canonical(record: dict) -> str:
+    return MARKER + payload_json(record)
+
+
+def encode(record: dict) -> str:
+    """Produce sorted compact UTF-8 JSON, never truncate an oversized record."""
+    validate(record)
+    body = canonical(record)
+    if len(body.encode("utf-8")) > POLICY["max_record_bytes"]:
+        raise ValueError("record_limit")
+    return body
+
+
+def unique_pairs(pairs: list) -> dict:
+    value = {}
+    for key, child in pairs:
+        if key in value:
+            raise ValueError("duplicate_json_key")
+        value[key] = child
+    return value
+
+
+def reject_constant(value: str):
+    raise ValueError("nonfinite_number")
+
+
+def decode(body: str) -> dict:
+    if not body.startswith(MARKER):
+        raise ValueError("unsupported_version")
+    if len(body.encode("utf-8")) > POLICY["max_record_bytes"]:
+        raise ValueError("record_limit")
+    try:
+        record = json.loads(body[len(MARKER):], object_pairs_hook=unique_pairs,
+                            parse_constant=reject_constant)
+        validate(record)
+    except (RecursionError, TypeError) as error:
+        raise ValueError("malformed_record") from error
+    return record
+
+
+def occurrence(record: dict, author: str = "profile-a", time: int = 1) -> dict:
+    return {"body": encode(record), "author": author, "created_at": time}
+
+
+def group(rows: list[dict], board: str, task_id: str) -> tuple:
+    records, sources, diagnostics = {}, defaultdict(list), set()
+    for row in rows:
+        body = row.get("body")
+        if not isinstance(body, str):
+            diagnostics.add("malformed_native_response")
+            continue
+        if not body.startswith("[hermes-outcome:"):
+            continue
+        try:
+            value = decode(body)
+        except ValueError as error:
+            diagnostics.add(str(error) if str(error) in {"unsupported_version", "record_limit", "integrity_mismatch"} else "malformed_record")
+            continue
+        identifier = value["record_id"]
+        sources[identifier].append(copy.deepcopy(row))
+        if not isinstance(row.get("author"), str) or not row["author"].strip() or type(row.get("created_at")) is not int:
+            diagnostics.add("missing_provenance")
+        if (value["board"], value["task_id"]) != (board, task_id):
+            diagnostics.add("target_mismatch")
+        if identifier in records and records[identifier] != value:
+            diagnostics.add("conflicting_payload")
+        else:
+            records[identifier] = value
+    return records, dict(sources), diagnostics
+
+
+def graph(records: dict) -> tuple[set[str], list[str]]:
+    """Compute a chain only when all parent relationships are unambiguous."""
+    diagnostics, children = set(), defaultdict(list)
+    for identifier, value in records.items():
+        predecessor = value["predecessor"]
+        children[predecessor].append(identifier)
+        if predecessor is not None and predecessor not in records:
+            diagnostics.add("missing_predecessor")
+    if any(len(ids) > 1 for ids in children.values()):
+        diagnostics.add("fork")
+    if has_cycle(records):
+        diagnostics.add("cycle")
+    chain = []
+    current = children.get(None, [])
+    while len(current) == 1 and not diagnostics:
+        chain.append(current[0])
+        current = children.get(current[0], [])
+    return diagnostics, chain
+
+
+def has_cycle(records: dict) -> bool:
+    finished = set()
+    for identifier in records:
+        active = set()
+        current = identifier
+        while current in records and current not in finished:
+            if current in active:
+                return True
+            active.add(current)
+            current = records[current]["predecessor"]
+        finished.update(active)
+    return False
+
+
+def evidence_valid(contract: dict, value: dict) -> bool:
+    criteria = {row["id"]: row for row in contract["criteria"]}
+    entries = value["evidence"]
+    ids = [row["criterion_id"] for row in entries]
+    if len(ids) != len(set(ids)) or set(ids) != set(criteria):
+        return False
+    if contract["requires_artifact"] and value["artifact"] is None:
+        return False
+    for row in entries:
+        needs_baseline = criteria[row["criterion_id"]]["requires_baseline"]
+        needs_baseline |= value["result"] == "regressed" and row["finding"] == "contradicted"
+        if needs_baseline and row["finding"] != "unknown" and row["baseline"] is None:
+            return False
+    findings = {row["finding"] for row in entries}
+    result_rules = {
+        "confirmed": findings == {"supported"},
+        "partially_confirmed": "supported" in findings and len(findings) > 1,
+        "not_confirmed": "contradicted" in findings,
+        "regressed": "contradicted" in findings,
+        "inconclusive": "unknown" in findings and "contradicted" not in findings,
+    }
+    return result_rules[value["result"]]
+
+
+def contextual(contract: dict | None, observations: dict, chain: list[str], status: str) -> set[str]:
+    diagnostics = set()
+    if observations and status != "done":
+        diagnostics.add("observations_on_unfinished")
+    if contract is None:
+        return diagnostics | ({"orphan_observation"} if observations else set())
+    ancestors = set()
+    for identifier in chain:
+        value = observations[identifier]
+        if value["result"] == "regressed":
+            reference = value["regression_of"]
+            if reference not in ancestors or observations[reference]["result"] not in {"confirmed", "partially_confirmed"}:
+                diagnostics.add("invalid_regression")
+            elif not regression_criteria_valid(observations[reference], value):
+                diagnostics.add("invalid_regression")
+        ancestors.add(identifier)
+    for value in observations.values():
+        if value["contract_id"] != contract["record_id"]:
+            diagnostics.add("orphan_observation")
+        elif not evidence_valid(contract, value):
+            diagnostics.add("invalid_evidence")
+    return diagnostics
+
+
+def regression_criteria_valid(previous: dict, current: dict) -> bool:
+    supported = {row["criterion_id"] for row in previous["evidence"] if row["finding"] == "supported"}
+    contradicted = {row["criterion_id"] for row in current["evidence"] if row["finding"] == "contradicted"}
+    return contradicted <= supported
+
+
+def result(state: str, diagnostics: set[str], sources: dict, latest: str | None = None) -> dict:
+    actions = {"invalid_history": "HISTORY_ATTENTION", "awaiting_observation": "OBSERVATION_REQUIRED",
+               "untracked": "NO_ACTION_REQUIRED", "planned": "NO_ACTION_REQUIRED", "confirmed": "NO_ACTION_REQUIRED"}
+    return {"state": state, "diagnostics": sorted(diagnostics), "latest": latest,
+            "occurrences": sources, "action": actions.get(state, "FOLLOWUP_SUGGESTED")}
+
+
+def reconstruct(rows: list[dict], status: str, board: str, task_id: str) -> dict:
+    """Apply invalid > empty > unfinished > unobserved > unique-head precedence."""
+    total = sum(len(row.get("body", "").encode("utf-8")) for row in rows
+                if isinstance(row.get("body"), str))
+    if len(rows) > POLICY["max_comments"] or total > POLICY["max_history_bytes"]:
+        return result("invalid_history", {"history_limit"}, {})
+    records, sources, diagnostics = group(rows, board, task_id)
+    contracts = [value for value in records.values() if value["type"] == "contract"]
+    observations = {key: value for key, value in records.items() if value["type"] == "observation"}
+    if len(contracts) > 1:
+        diagnostics.add("multiple_contracts")
+    contract = contracts[0] if len(contracts) == 1 else None
+    graph_errors, chain = graph(observations)
+    diagnostics.update(graph_errors)
+    diagnostics.update(contextual(contract, observations, chain, status))
+    if diagnostics:
+        return result("invalid_history", diagnostics, sources)
+    if not contract:
+        return result("untracked", set(), sources)
+    if status != "done":
+        return result("planned", set(), sources)
+    if not chain:
+        return result("awaiting_observation", set(), sources)
+    latest = chain[-1]
+    return result(observations[latest]["result"], set(), sources, latest)
+
+
+def evaluate_case(case: dict, golden: dict) -> dict:
+    rows = []
+    for entry in case["records"]:
+        value = copy.deepcopy(golden[entry if isinstance(entry, str) else entry["base"]])
+        if isinstance(entry, dict):
+            value.update(entry["set"])
+        rows.append(occurrence(seal(value)))
+    return reconstruct(rows, case["status"], "sample-board", "sample-root")
+
+
+def resolve_board(requested: str | None, ambient: str | None, pinned: bool) -> str:
+    """Require an explicit board or a verifiable worker slug; never infer a path."""
+    if pinned and (not ambient or requested not in (None, ambient)):
+        raise ValueError("board_fence")
+    board = requested or (ambient if pinned else None)
+    if not isinstance(board, str) or not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,63}", board):
+        raise ValueError("board_required")
+    return board
+
+
+def readback(expected: str, stored: str | None) -> str:
+    """A byte-identical stored record is necessary, not sufficient, for success."""
+    if stored is None:
+        return "write_unverified"
+    try:
+        decode(stored)
+    except ValueError:
+        return "write_unverified"
+    return "verified" if stored == expected else "write_unverified"
+
+
+def timestamp(value: str) -> datetime:
+    if not isinstance(value, str) or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z", value):
+        raise ValueError("invalid_timestamp")
+    return datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ")
+
+
+def due(timing: dict, anchors: dict, now: str) -> str:
+    deadlines = []
+    if timing["deadline"]:
+        deadlines.append(timestamp(timing["deadline"]))
+    anchor = anchors.get(timing["anchor"])
+    if anchor:
+        deadlines.append(timestamp(anchor) + timedelta(seconds=timing["delay_seconds"]))
+    if not deadlines:
+        return "due_time_unknown"
+    current, deadline = timestamp(now), min(deadlines)
+    if current == deadline:
+        return "due"
+    return "overdue" if current > deadline else "not_due"
+
+
+def preflight(record: dict, rows: list[dict], status: str) -> str:
+    """Specify admission, not atomic insertion or a dispatch implementation."""
+    encode(record)
+    if record["type"] == "observation" and status != "done":
+        raise ValueError("unfinished_task")
+    history = reconstruct(rows, status, record["board"], record["task_id"])
+    if history["state"] == "invalid_history":
+        raise ValueError("invalid_history")
+    records = {decode(row["body"])["record_id"]: decode(row["body"]) for row in rows
+               if row["body"].startswith(MARKER)}
+    existing = records.get(record["record_id"])
+    if existing is not None:
+        if existing != record:
+            raise ValueError("conflict")
+        return "identical_retry"
+    if record["type"] == "contract" and records:
+        raise ValueError("conflict")
+    if record["type"] == "observation" and record["predecessor"] != history["latest"]:
+        raise ValueError("stale_predecessor")
+    proposed = reconstruct(rows + [occurrence(record)], status, record["board"], record["task_id"])
+    if proposed["state"] == "invalid_history":
+        raise ValueError("invalid_history")
+    return "append"
+
+
+def audit_spec() -> None:
+    """Constrain this oracle, not all plugin Python, to data-only operations."""
+    tree = ast.parse((ROOT / "scripts/outcome_spec.py").read_text(encoding="utf-8"))
+    allowed = {"__future__", "ast", "collections", "copy", "datetime", "hashlib", "json", "pathlib", "re", "urllib.parse",
+               "jsonschema", "referencing", "referencing.exceptions"}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            if any(alias.name not in allowed for alias in node.names):
+                raise ValueError("forbidden_spec_import")
+        elif isinstance(node, ast.ImportFrom) and node.module not in allowed:
+            raise ValueError("forbidden_spec_import")
+        elif isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+            if node.func.attr in {"write_text", "write_bytes", "open", "dispatch_tool", "execute", "connect"}:
+                raise ValueError("forbidden_spec_effect")

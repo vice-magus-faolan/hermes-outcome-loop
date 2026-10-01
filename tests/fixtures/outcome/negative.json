@@ -1,0 +1,18 @@
+[
+  {"name": "unknown_version", "base": "contract", "set": {"version": 2}},
+  {"name": "spoof_author", "base": "confirmed", "set": {"observed_by": "spoof"}},
+  {"name": "missing_environment", "base": "confirmed", "remove": ["environment"]},
+  {"name": "missing_retry_id", "base": "confirmed", "remove": ["record_id"]},
+  {"name": "missing_evidence", "base": "confirmed", "set": {"evidence": []}},
+  {"name": "bad_result", "base": "confirmed", "set": {"result": "success"}},
+  {"name": "invalid_date", "base": "confirmed", "set": {"observed_at": "2026-02-30T00:00:00Z"}},
+  {"name": "blank_summary", "base": "confirmed", "set": {"summary": "  "}},
+  {"name": "unsafe_board", "base": "contract", "set": {"board": "../board"}},
+  {"name": "empty_criteria", "base": "contract", "set": {"criteria": []}},
+  {"name": "regression_without_reference", "base": "regressed", "set": {"regression_of": null}},
+  {"name": "spurious_regression_reference", "base": "confirmed", "set": {"regression_of": "oo_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}},
+  {"name": "unknown_extension", "base": "contract", "set": {"metadata": {"instructions": "untrusted data"}}},
+  {"name": "ambiguous_anchor", "base": "contract", "set": {"timing": {"observe_when": "manual", "deadline": null, "anchor": null, "delay_seconds": 1}}},
+  {"name": "verification_is_not_outcome", "base": "confirmed", "set": {"evidence": [{"criterion_id": "c_workflow", "kind": "verification", "finding": "supported", "summary": "Tests passed before delivery.", "pointer": null, "baseline": null}]}},
+  {"name": "query_pointer", "base": "confirmed", "set": {"evidence": [{"criterion_id": "c_workflow", "kind": "outcome", "finding": "supported", "summary": "Workflow observed.", "pointer": "https://example.invalid/evidence?key=synthetic", "baseline": null}]}}
+]

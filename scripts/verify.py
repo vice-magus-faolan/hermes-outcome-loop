@@ -4,7 +4,8 @@
 
 Phase-0 integration requires HERMES_PHASE0_SOURCE and HERMES_PHASE0_PYTHON
 (an already provisioned Hermes dependency venv). Missing prerequisites and
-unsupported required interfaces fail, never skip. This is not plugin acceptance.
+unsupported required interfaces fail, never skip. Schema/oracle checks require
+requirements-dev.txt in a repo-local environment. This is not plugin acceptance.
 """
 from __future__ import annotations
 
@@ -22,6 +23,8 @@ def main() -> int:
     from phase0_audit import main as audit_phase0
     if audit_phase0():
         return 1
+    from outcome_spec import check_schemas
+    check_schemas()  # Metaschemas and closed refs, not merely JSON syntax.
     for directory in ("scripts", "tests", "src", "plugin", "hermes_outcome_loop"):
         for path in sorted((ROOT / directory).rglob("*.py")):
             ast.parse(path.read_text(encoding="utf-8"), filename=str(path))

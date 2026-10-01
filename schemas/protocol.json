@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "marker": "[hermes-outcome:v1]\n",
+  "max_record_bytes": 16384,
+  "max_comments": 1024,
+  "max_history_bytes": 2097152,
+  "allowed_native_tools": ["kanban_show", "kanban_comment"],
+  "read_tools": ["outcome_show", "outcome_check"],
+  "completion_hook": false,
+  "automatic_followup": false,
+  "persistent_cache": false,
+  "acceptance_boundaries": ["authority", "schema", "identity_retry", "concurrency_order", "diagnostics", "completion", "results_states", "regression", "provenance_evidence", "board_fences", "timing", "limits", "redaction_readback", "no_action_followup", "architecture", "verification"]
+}

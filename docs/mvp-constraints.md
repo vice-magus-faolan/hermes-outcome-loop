@@ -1,8 +1,10 @@
 # Reviewed MVP constraints
 
 Approved bootstrap direction: 2026-09-30. These clarifications take precedence
-where the original handoff is ambiguous. The implementation ADR and schemas
-remain pending Phase-0 evidence and independent review.
+where the original handoff is ambiguous. Phase-0 evidence has independent review.
+The [native-record ADR](decisions/2026-10-01-native-record-contract.md),
+[v1 record protocol](record-protocol.md) and [acceptance mapping](acceptance-tests.md)
+now specify implementation decisions, pending their independent exact-artifact review.
 
 ## Authority and failure
 
@@ -62,8 +64,8 @@ remain pending Phase-0 evidence and independent review.
 ## Scope
 
 No dashboard, scheduler, fleet crawler, automatic remediation, lifecycle interception,
-or extra task database. Omit a completion hook unless Phase 0 shows a concrete need;
-correctness derives from fresh native reads even if hooks are absent or replayed.
+or extra task database. Omit the completion hook: Phase 0 found incorrect cross-board
+routing and synchronous caller delay; correctness derives from explicit fresh reads.
 The four proposed tools are sufficient. Follow-up work is suggested, never created.
 
 ## Phase-0 stop rule

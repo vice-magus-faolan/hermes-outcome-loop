@@ -1,6 +1,7 @@
 # MVP roadmap
 
-This roadmap describes pending work; it does not claim delivery.
+Phase 0 has independent exact-artifact review. ADR/schemas are proposed for review;
+production implementation and repository delivery remain pending.
 
 1. **Phase 0 — public-interface feasibility.** Record installed Hermes version/full
    SHA, public API contracts and actual disposable-board probe results. Prove
@@ -10,6 +11,8 @@ This roadmap describes pending work; it does not claim delivery.
 2. **ADR and schemas.** Use Phase-0 findings to approve the native-record design,
    immutable contract/observation schemas, IDs/retries/concurrency, derived-state
    precedence, diagnostics, native provenance, board scope and timing rules.
+   See the [ADR](decisions/2026-10-01-native-record-contract.md),
+   [protocol](record-protocol.md) and [acceptance mapping](acceptance-tests.md).
 3. **Core plugin and unit/architecture tests.** Implement four tools and a narrow
    native-tool adapter; no hook needed for correctness. Exercise every result,
    malformed history, redaction, duplicate/conflict, failed read/write/readback,

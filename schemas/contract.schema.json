@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/outcome/contract.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["version", "type", "record_id", "payload_sha256", "board", "task_id", "objective", "expected_outcome", "criteria", "timing", "requires_artifact", "notes"],
+  "properties": {
+    "version": {"const": 1}, "type": {"const": "contract"},
+    "record_id": {"$ref": "common.schema.json#/$defs/contract_id"},
+    "payload_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "board": {"$ref": "common.schema.json#/$defs/board"},
+    "task_id": {"$ref": "common.schema.json#/$defs/task_id"},
+    "objective": {"type": "string", "minLength": 1, "maxLength": 1024, "pattern": "\\S"},
+    "expected_outcome": {"type": "string", "minLength": 1, "maxLength": 2048, "pattern": "\\S"},
+    "criteria": {"type": "array", "minItems": 1, "maxItems": 16, "items": {"$ref": "common.schema.json#/$defs/criterion"}},
+    "timing": {"$ref": "common.schema.json#/$defs/timing"},
+    "requires_artifact": {"type": "boolean"},
+    "notes": {"type": "string", "maxLength": 2048}
+  }
+}

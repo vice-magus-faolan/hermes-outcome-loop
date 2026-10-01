@@ -1,0 +1,78 @@
+{
+  "contract": {
+    "payload_sha256": "d17b4e5e65e46b520b6b2ea614118c992b19284ee47984728b24f7761a412222",
+    "version": 1, "type": "contract", "record_id": "oc_11111111111111111111111111111111",
+    "board": "sample-board", "task_id": "sample-root",
+    "objective": "Make the Workflow usable — safely.",
+    "expected_outcome": "A delivered Workflow completes without duplicate work.",
+    "criteria": [{"id": "c_workflow", "description": "The real Workflow completes without duplicate work.", "requires_baseline": false}],
+    "timing": {"observe_when": "24 hours after deployment", "deadline": null, "anchor": "deployment", "delay_seconds": 86400},
+    "requires_artifact": true, "notes": ""
+  },
+  "partial_contract": {
+    "payload_sha256": "c54ee551b88b1e5d6ee7f7ca2764665f34c4ba5dc82966a3ac6a6610ed904a52",
+    "version": 1, "type": "contract", "record_id": "oc_11111111111111111111111111111111",
+    "board": "sample-board", "task_id": "sample-root",
+    "objective": "Make the Workflow usable — safely.",
+    "expected_outcome": "A delivered Workflow completes without duplicate work.",
+    "criteria": [
+      {"id": "c_workflow", "description": "The real Workflow completes without duplicate work.", "requires_baseline": false},
+      {"id": "c_other", "description": "A second Workflow also works.", "requires_baseline": false}
+    ],
+    "timing": {"observe_when": "24 hours after deployment", "deadline": null, "anchor": "deployment", "delay_seconds": 86400},
+    "requires_artifact": true, "notes": ""
+  },
+  "confirmed": {
+    "payload_sha256": "3695e14f8ffa1e7b033530a51f12503563e749465e9e82fc25ebcf10557ebed1",
+    "version": 1, "type": "observation", "record_id": "oo_ffffffffffffffffffffffffffffffff",
+    "contract_id": "oc_11111111111111111111111111111111", "board": "sample-board", "task_id": "sample-root",
+    "predecessor": null, "result": "confirmed", "regression_of": null,
+    "observed_at": "2026-10-02T00:00:00Z", "environment": "isolated integration environment", "artifact": "release-example-v1",
+    "summary": "Workflow observed after delivery.",
+    "evidence": [{"criterion_id": "c_workflow", "kind": "outcome", "finding": "supported", "summary": "One real workflow completed; no duplicates.", "pointer": "https://example.invalid/evidence/workflow", "baseline": null}],
+    "residual_risk": ["Concurrent workflows have not been load-tested."]
+  },
+  "regressed": {
+    "payload_sha256": "f87078288546f9a16f2e6d247e5ddf7960395cbda381cf0cb4bd28968a372ad3",
+    "version": 1, "type": "observation", "record_id": "oo_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "contract_id": "oc_11111111111111111111111111111111", "board": "sample-board", "task_id": "sample-root",
+    "predecessor": "oo_ffffffffffffffffffffffffffffffff", "result": "regressed", "regression_of": "oo_ffffffffffffffffffffffffffffffff",
+    "observed_at": "2026-10-02T00:00:00Z", "environment": "isolated integration environment", "artifact": "release-example-v1",
+    "summary": "Workflow observed after delivery.",
+    "evidence": [{"criterion_id": "c_workflow", "kind": "outcome", "finding": "contradicted", "summary": "Repeat Workflow produced duplicate work.", "pointer": "https://example.invalid/evidence/workflow", "baseline": {"before": "Earlier Workflow produced no duplicates.", "after": "Repeat Workflow produced duplicate work.", "comparison": "Behavior deteriorated under the same declared criterion.", "pointer": null}}],
+    "residual_risk": ["Concurrent workflows have not been load-tested."]
+  },
+  "partial": {
+    "payload_sha256": "a152945b898d6d5135ab4506b2001cce7ad27ee3ca6408a817c1cc43e4bbcb12",
+    "version": 1, "type": "observation", "record_id": "oo_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "contract_id": "oc_11111111111111111111111111111111", "board": "sample-board", "task_id": "sample-root",
+    "predecessor": null, "result": "partially_confirmed", "regression_of": null,
+    "observed_at": "2026-10-02T00:00:00Z", "environment": "isolated integration environment", "artifact": "release-example-v1",
+    "summary": "Workflow observed after delivery.",
+    "evidence": [
+      {"criterion_id": "c_workflow", "kind": "outcome", "finding": "supported", "summary": "One real workflow completed; no duplicates.", "pointer": "https://example.invalid/evidence/workflow", "baseline": null},
+      {"criterion_id": "c_other", "kind": "outcome", "finding": "unknown", "summary": "Second Workflow not yet observed.", "pointer": null, "baseline": null}
+    ],
+    "residual_risk": ["Concurrent workflows have not been load-tested."]
+  },
+  "failed": {
+    "payload_sha256": "ef75abe8200cbb1910b07bc0e4d3aee79783f8a9f9b0ba26b0b03b2d02417c6a",
+    "version": 1, "type": "observation", "record_id": "oo_cccccccccccccccccccccccccccccccc",
+    "contract_id": "oc_11111111111111111111111111111111", "board": "sample-board", "task_id": "sample-root",
+    "predecessor": null, "result": "not_confirmed", "regression_of": null,
+    "observed_at": "2026-10-02T00:00:00Z", "environment": "isolated integration environment", "artifact": "release-example-v1",
+    "summary": "Workflow observed after delivery.",
+    "evidence": [{"criterion_id": "c_workflow", "kind": "outcome", "finding": "contradicted", "summary": "Workflow produced duplicate work.", "pointer": "https://example.invalid/evidence/workflow", "baseline": null}],
+    "residual_risk": ["Concurrent workflows have not been load-tested."]
+  },
+  "inconclusive": {
+    "payload_sha256": "82a716d3c5ae29a8687f8a7b7c1ddcf949249a6e202af1a230ad243f6f749cfd",
+    "version": 1, "type": "observation", "record_id": "oo_dddddddddddddddddddddddddddddddd",
+    "contract_id": "oc_11111111111111111111111111111111", "board": "sample-board", "task_id": "sample-root",
+    "predecessor": null, "result": "inconclusive", "regression_of": null,
+    "observed_at": "2026-10-02T00:00:00Z", "environment": "isolated integration environment", "artifact": "release-example-v1",
+    "summary": "Workflow observed after delivery.",
+    "evidence": [{"criterion_id": "c_workflow", "kind": "outcome", "finding": "unknown", "summary": "Workflow evidence is incomplete.", "pointer": null, "baseline": null}],
+    "residual_risk": ["Concurrent workflows have not been load-tested."]
+  }
+}

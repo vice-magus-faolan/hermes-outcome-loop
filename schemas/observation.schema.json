@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/outcome/observation.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["version", "type", "record_id", "payload_sha256", "contract_id", "board", "task_id", "predecessor", "result", "regression_of", "observed_at", "environment", "artifact", "summary", "evidence", "residual_risk"],
+  "properties": {
+    "version": {"const": 1}, "type": {"const": "observation"},
+    "record_id": {"$ref": "common.schema.json#/$defs/observation_id"},
+    "payload_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "contract_id": {"$ref": "common.schema.json#/$defs/contract_id"},
+    "board": {"$ref": "common.schema.json#/$defs/board"},
+    "task_id": {"$ref": "common.schema.json#/$defs/task_id"},
+    "predecessor": {"anyOf": [{"$ref": "common.schema.json#/$defs/observation_id"}, {"type": "null"}]},
+    "result": {"enum": ["confirmed", "partially_confirmed", "not_confirmed", "regressed", "inconclusive"]},
+    "regression_of": {"anyOf": [{"$ref": "common.schema.json#/$defs/observation_id"}, {"type": "null"}]},
+    "observed_at": {"$ref": "common.schema.json#/$defs/time"},
+    "environment": {"type": "string", "minLength": 1, "maxLength": 512, "pattern": "\\S"},
+    "artifact": {"anyOf": [{"type": "string", "minLength": 1, "maxLength": 512, "pattern": "\\S"}, {"type": "null"}]},
+    "summary": {"type": "string", "minLength": 1, "maxLength": 2048, "pattern": "\\S"},
+    "evidence": {"type": "array", "minItems": 1, "maxItems": 16, "items": {"$ref": "common.schema.json#/$defs/evidence"}},
+    "residual_risk": {"type": "array", "maxItems": 8, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 512, "pattern": "\\S"}}
+  },
+  "allOf": [{
+    "if": {"properties": {"result": {"const": "regressed"}}},
+    "then": {"properties": {"regression_of": {"$ref": "common.schema.json#/$defs/observation_id"}}},
+    "else": {"properties": {"regression_of": {"type": "null"}}}
+  }]
+}
