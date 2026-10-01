@@ -1,6 +1,14 @@
 # Phase-0 public-interface findings
 
-Status: **NO-GO under the approved MVP constraints.** Feasibility is incomplete;
+Status of the original 2026-09-30 artifact: **NO-GO under the original approved MVP constraints.**
+
+On 2026-10-01 the operator approved the [logical-ID/predecessor ordering
+amendment](decisions/2026-10-01-record-ordering.md) and resuming Phase 0. The
+historical evidence below is preserved, not retroactively turned into a pass.
+Remaining probes, updated canonical checks and independent review are still
+required; there is no current feasibility or implementation acceptance.
+
+Original finding: feasibility is incomplete;
 this is a recoverable evidence artifact, not an approved plugin or delivery.
 The Phase-0 stop rule applies. Implementation and schema successors must remain
 gated until the operator accepts a revised requirement or a supported interface

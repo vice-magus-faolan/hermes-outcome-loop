@@ -12,7 +12,8 @@ there is no independent outcome database or scheduler.
 - [Original project handoff](docs/project-handoff.md)
 - [Reviewed MVP constraints](docs/mvp-constraints.md) — governs clarifications to the handoff
 - [Delivery roadmap](docs/roadmap.md)
-- [Phase-0 findings and reproduction](docs/phase-0-findings.md) — current feasibility is NO-GO
+- [Phase-0 findings and reproduction](docs/phase-0-findings.md) — preserved original NO-GO evidence
+- [Approved logical-ordering amendment](docs/decisions/2026-10-01-record-ordering.md) — Phase-0 continuation authorized, remaining feasibility checks pending
 - [Contributor and agent boundaries](AGENTS.md)
 
 The proposed tool surface is `outcome_define`, `outcome_show`, `outcome_observe`,
@@ -31,11 +32,14 @@ to the read-only installed Hermes checkout and `HERMES_PHASE0_PYTHON` to its alr
 provisioned dependency venv's `bin/python` (preserve the symlink). Missing runtime
 prerequisites fail, never skip. See the findings for exact reproduction commands.
 
-The current installed public reader omits required native comment IDs, so canonical
-verification deliberately fails the feasibility gate. Evidence collection success
-is not plugin acceptance. No production plugin has been implemented; remaining
-worker/failure/profile probes await a reviewed feasibility decision. Future work
-must extend this same command for schemas, architecture, packaging and integration.
+The installed public reader omits native comment IDs. On 2026-10-01 the operator
+approved logical record IDs with explicit predecessor references and visible fork
+or conflict diagnostics instead of native-ID ordering. That direction is recorded
+in the amendment above; it is not feasibility acceptance. The existing canonical
+suite remains red until the resumed Phase-0 worker replaces the obsolete assertion
+with causal-ordering evidence and completes the remaining worker/failure/profile
+probes. No production plugin has been implemented. Future work must extend this
+same command for schemas, architecture, packaging and integration.
 
 ## Delivery
 

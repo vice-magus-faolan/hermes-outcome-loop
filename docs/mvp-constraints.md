@@ -26,9 +26,17 @@ remain pending Phase-0 evidence and independent review.
 - Use an explicit version marker and deterministic JSON schema. Contract and
   observation records require stable identifiers. Observation calls need an explicit
   retry key/ID, plus contract identity, so later genuine observations remain distinct.
-- Sort by native comment IDs, not timestamp alone. Report malformed records,
-  unsupported versions, orphan observations and same-ID/different-payload conflicts.
-  Do not silently label an unreadable history `untracked` or claim success from it.
+- Reconstruct observations by stable logical record IDs and explicit predecessor
+  references persisted in native comments, independent of returned comment order.
+  Native comment IDs are not required and timestamps are not ordering authority.
+  A unique valid chain has a determinable latest observation; concurrent branches,
+  missing predecessors, cycles and same-ID/different-payload conflicts produce
+  visible ambiguity/invalid-history diagnostics, never an invented winner.
+  Report malformed records, unsupported versions and orphan observations.
+  Preserve each native author/time occurrence when grouping identical retries;
+  do not silently collapse contradictory provenance. Do not label unreadable or
+  ambiguous history `untracked` or claim an unqualified successful outcome.
+  See the [approved ordering amendment](decisions/2026-10-01-record-ordering.md).
 - Concurrent read/append is not an atomic uniqueness operation. The ADR must document
   logical deduplication and conflict reporting using native records, with no hidden
   lock/database becoming authoritative. Race and retry tests are required.
