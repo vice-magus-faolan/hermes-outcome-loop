@@ -1,0 +1,15 @@
+[
+  {"name": "null_row", "rows": [null], "diagnostics": ["malformed_native_response"]},
+  {"name": "nonobject_row", "rows": ["synthetic-invalid-row"], "diagnostics": ["malformed_native_response"]},
+  {"name": "missing_body", "rows": [{"author": "profile-a", "created_at": 1}], "diagnostics": ["malformed_native_response"]},
+  {"name": "nonstring_body", "rows": [{"body": 7, "author": "profile-a", "created_at": 1}], "diagnostics": ["malformed_native_response"]},
+  {"name": "ordinary_missing_provenance", "rows": [{"body": "ordinary"}], "diagnostics": ["missing_provenance"]},
+  {"name": "ordinary_blank_author", "rows": [{"body": "ordinary", "author": "  ", "created_at": 1}], "diagnostics": ["missing_provenance"]},
+  {"name": "ordinary_nonstr_author", "rows": [{"body": "ordinary", "author": null, "created_at": 1}], "diagnostics": ["missing_provenance"]},
+  {"name": "ordinary_nonstr_time", "rows": [{"body": "ordinary", "author": "profile-a", "created_at": "1"}], "diagnostics": ["missing_provenance"]},
+  {"name": "ordinary_bool_time", "rows": [{"body": "ordinary", "author": "profile-a", "created_at": true}], "diagnostics": ["missing_provenance"]},
+  {"name": "ordinary_negative_time", "rows": [{"body": "ordinary", "author": "profile-a", "created_at": -1}], "diagnostics": ["missing_provenance"]},
+  {"name": "ordinary_invalid_unicode", "rows": [{"body": "synthetic-\ud800", "author": "profile-a", "created_at": 1}], "diagnostics": ["malformed_native_response"]},
+  {"name": "marked_invalid_unicode", "rows": [{"body": "[hermes-outcome:v1]\n\ud800", "author": "profile-a", "created_at": 1}], "diagnostics": ["malformed_native_response"]},
+  {"name": "author_invalid_unicode", "rows": [{"body": "ordinary", "author": "profile-\ud800", "created_at": 1}], "diagnostics": ["missing_provenance"]}
+]

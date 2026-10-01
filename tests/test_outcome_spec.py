@@ -20,6 +20,13 @@ def load(name):
     return json.loads((FIXTURES / name).read_text(encoding="utf-8"))
 
 
+def replace_path(record, path, value):
+    target = record
+    for key in path[:-1]:
+        target = target[key]
+    target[path[-1]] = value
+
+
 class SchemaTests(unittest.TestCase):
     def test_metaschemas_and_closed_offline_registry(self):
         oracle.check_schemas()
@@ -135,6 +142,47 @@ class HistoryTests(unittest.TestCase):
                     self.assertEqual(result["diagnostics"], case["diagnostics"])
                     self.assertIsNone(result["latest"])
 
+    def test_conflicting_variants_retain_every_native_occurrence(self):
+        golden = load("golden.json")
+        variant = oracle.seal(dict(golden["confirmed"], artifact=None))
+        rows = [oracle.occurrence(golden["contract"]),
+                oracle.occurrence(golden["confirmed"], "profile-a", 1),
+                oracle.occurrence(variant, "profile-b", 2),
+                oracle.occurrence(golden["confirmed"], "profile-c", 3)]
+        for permutation in itertools.permutations(rows):
+            result = oracle.reconstruct(list(permutation), "done", "sample-board", "sample-root")
+            self.assertEqual(result["diagnostics"], ["conflicting_payload", "invalid_evidence"])
+            self.assertIsNone(result["latest"])
+            sources = result["occurrences"][golden["confirmed"]["record_id"]]
+            self.assertCountEqual(sources, rows[1:])
+
+    def test_malformed_native_response_fixtures_fail_observationally(self):
+        golden = load("golden.json")
+        valid = [oracle.occurrence(golden["contract"]), oracle.occurrence(golden["confirmed"])]
+        for case in load("native-responses.json"):
+            for prefix in ([], valid):
+                rows = prefix + case["rows"]
+                for permutation in itertools.permutations(rows):
+                    with self.subTest(case=case["name"], mixed=bool(prefix)):
+                        result = oracle.reconstruct(list(permutation), "done", "sample-board", "sample-root")
+                        self.assertEqual(result["state"], "invalid_history")
+                        self.assertEqual(result["diagnostics"], case["diagnostics"])
+                        self.assertIsNone(result["latest"])
+                        self.assertEqual(result["action"], "HISTORY_ATTENTION")
+                        retained = [row for sources in result["occurrences"].values() for row in sources]
+                        self.assertCountEqual(retained, prefix)
+                        with self.assertRaisesRegex(ValueError, "invalid_history"):
+                            oracle.preflight(golden["contract"], list(permutation), "done")
+        for container in (None, {}, "synthetic-invalid-list"):
+            result = oracle.reconstruct(container, "done", "sample-board", "sample-root")
+            self.assertEqual(result["state"], "invalid_history")
+            self.assertEqual(result["diagnostics"], ["malformed_native_response"])
+        for field, value in (("author", None), ("created_at", True), ("created_at", -1)):
+            row = dict(valid[1], **{field: value})
+            result = oracle.reconstruct([valid[0], row], "done", "sample-board", "sample-root")
+            self.assertEqual(result["diagnostics"], ["missing_provenance"])
+            self.assertEqual(result["state"], "invalid_history")
+
     def test_recovery_is_new_head_and_preserves_regression(self):
         golden = load("golden.json")
         recovery = oracle.seal(dict(golden["confirmed"], record_id="oo_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
@@ -168,6 +216,9 @@ class HistoryTests(unittest.TestCase):
             result = oracle.reconstruct(rows, "done", "sample-board", "sample-root")
             self.assertEqual(result["state"], "invalid_history")
             self.assertIn("history_limit", result["diagnostics"])
+        result = oracle.reconstruct([dict(row, body="x" * 2100000, author=None)],
+                                    "done", "sample-board", "sample-root")
+        self.assertEqual(result["diagnostics"], ["history_limit", "missing_provenance"])
 
     def test_missing_native_provenance_is_not_caller_attribution(self):
         row = oracle.occurrence(load("golden.json")["contract"])
@@ -178,6 +229,32 @@ class HistoryTests(unittest.TestCase):
 
 
 class AdmissionTests(unittest.TestCase):
+    def test_uri_forms_in_every_nested_text_field(self):
+        fixture = load("uri-admission.json")
+        golden = load("golden.json")
+        for entry in fixture["fields"]:
+            for text in fixture["rejected"]:
+                value = copy.deepcopy(golden[entry["base"]])
+                replace_path(value, entry["path"], text)
+                value = oracle.seal(value)
+                with self.subTest(path=entry["path"], text=text):
+                    with self.assertRaisesRegex(ValueError, "unsafe_pointer"):
+                        oracle.encode(value)
+                    with self.assertRaisesRegex(ValueError, "unsafe_pointer"):
+                        oracle.decode(oracle.canonical(value))
+            for text in fixture["allowed"]:
+                value = copy.deepcopy(golden[entry["base"]])
+                replace_path(value, entry["path"], text)
+                value = oracle.seal(value)
+                with self.subTest(path=entry["path"], text=text):
+                    self.assertEqual(oracle.decode(oracle.encode(value)), value)
+        for path in (["evidence", 0, "pointer"], ["evidence", 0, "baseline", "pointer"]):
+            for text in fixture["rejected"]:
+                value = copy.deepcopy(golden["regressed"])
+                replace_path(value, path, text)
+                with self.subTest(path=path, text=text), self.assertRaises(ValueError):
+                    oracle.encode(oracle.seal(value))
+
     def test_board_fences_fail_before_dispatch(self):
         self.assertEqual(oracle.resolve_board(None, "sample-board", True), "sample-board")
         self.assertEqual(oracle.resolve_board("sample-board", None, False), "sample-board")
@@ -191,7 +268,8 @@ class AdmissionTests(unittest.TestCase):
         record = load("golden.json")["confirmed"]
         body = oracle.encode(record)
         self.assertEqual(oracle.readback(body, body), "verified")
-        for stored in (body.replace("Workflow", "[REDACTED]"), body.replace("Workflow", "Changed"), body[:80], None):
+        for stored in (body.replace("Workflow", "[REDACTED]"), body.replace("Workflow", "Changed"),
+                       body[:80], None, 7, {}, "[hermes-outcome:v1]\n\ud800"):
             self.assertEqual(oracle.readback(body, stored), "write_unverified")
 
     def test_sensitive_inputs_and_opaque_url_credentials_rejected(self):

@@ -88,7 +88,9 @@ def admit_text(text: str) -> None:
     sensitive = r"(?i)(?:\b(?:[a-z_]*api[_-]?key|[a-z_]*token|password|secret)\s*[:=]|\bbearer\s|-----BEGIN .*PRIVATE KEY-----|\[REDACTED\]|\b(?:sk-|ghp_|github_pat_)[A-Za-z0-9_-]+)"
     if re.search(sensitive, text):
         raise ValueError("sensitive_input")
-    for url in re.findall(r"[A-Za-z][A-Za-z0-9+.-]*://[^\s]+", text):
+    # A scheme need not have // (data:, file:, urn:, mailto:). Token boundaries
+    # keep ISO timestamps/clock times and spaced prose labels out of this grammar.
+    for url in re.findall(r"(?<![A-Za-z0-9+._-])[A-Za-z][A-Za-z0-9+.-]*:[^\s]+", text):
         parsed = urlsplit(url)
         if parsed.scheme != "https" or parsed.username or parsed.query or parsed.fragment:
             raise ValueError("unsafe_pointer")
@@ -170,6 +172,8 @@ def reject_constant(value: str):
 
 
 def decode(body: str) -> dict:
+    if not isinstance(body, str):
+        raise ValueError("malformed_record")
     if not body.startswith(MARKER):
         raise ValueError("unsupported_version")
     if len(body.encode("utf-8")) > POLICY["max_record_bytes"]:
@@ -187,13 +191,48 @@ def occurrence(record: dict, author: str = "profile-a", time: int = 1) -> dict:
     return {"body": encode(record), "author": author, "created_at": time}
 
 
-def group(rows: list[dict], board: str, task_id: str) -> tuple:
-    records, sources, diagnostics = {}, defaultdict(list), set()
+def utf8_length(value: object) -> int | None:
+    """Return a safe byte count without echoing malformed native text."""
+    if not isinstance(value, str):
+        return None
+    try:
+        return len(value.encode("utf-8", errors="strict"))
+    except UnicodeError:
+        return None
+
+
+def inspect_native(rows: list[object]) -> tuple[list[dict], set[str]]:
+    """Validate every row, including unrelated comments, before record parsing."""
+    admitted, diagnostics, total = [], set(), 0
     for row in rows:
-        body = row.get("body")
-        if not isinstance(body, str):
+        if not isinstance(row, dict):
             diagnostics.add("malformed_native_response")
             continue
+        size = utf8_length(row.get("body"))
+        if size is None:
+            diagnostics.add("malformed_native_response")
+            continue
+        total += size  # Count valid bodies even when their provenance is unusable.
+        author, created = row.get("author"), row.get("created_at")
+        if not provenance_valid(author, created):
+            diagnostics.add("missing_provenance")
+            continue
+        admitted.append(row)
+    if len(rows) > POLICY["max_comments"] or total > POLICY["max_history_bytes"]:
+        diagnostics.add("history_limit")
+    return admitted, diagnostics
+
+
+def provenance_valid(author: object, created: object) -> bool:
+    return (isinstance(author, str) and bool(author.strip()) and utf8_length(author) is not None
+            and type(created) is int and created >= 0)
+
+
+def group(rows: list[dict], board: str, task_id: str) -> tuple:
+    """Retain all admitted occurrences and distinct payload variants, no winner."""
+    records, sources, diagnostics = defaultdict(list), defaultdict(list), set()
+    for row in rows:
+        body = row["body"]
         if not body.startswith("[hermes-outcome:"):
             continue
         try:
@@ -203,49 +242,56 @@ def group(rows: list[dict], board: str, task_id: str) -> tuple:
             continue
         identifier = value["record_id"]
         sources[identifier].append(copy.deepcopy(row))
-        if not isinstance(row.get("author"), str) or not row["author"].strip() or type(row.get("created_at")) is not int:
-            diagnostics.add("missing_provenance")
         if (value["board"], value["task_id"]) != (board, task_id):
             diagnostics.add("target_mismatch")
-        if identifier in records and records[identifier] != value:
+        if value not in records[identifier]:
+            records[identifier].append(value)
+        if len(records[identifier]) > 1:
             diagnostics.add("conflicting_payload")
-        else:
-            records[identifier] = value
-    return records, dict(sources), diagnostics
+    return dict(records), dict(sources), diagnostics
 
 
 def graph(records: dict) -> tuple[set[str], list[str]]:
-    """Compute a chain only when all parent relationships are unambiguous."""
-    diagnostics, children = set(), defaultdict(list)
-    for identifier, value in records.items():
-        predecessor = value["predecessor"]
-        children[predecessor].append(identifier)
-        if predecessor is not None and predecessor not in records:
-            diagnostics.add("missing_predecessor")
+    """Diagnose union edges; only single-variant groups can yield a chain."""
+    diagnostics, children = set(), defaultdict(set)
+    for identifier, variants in records.items():
+        for value in variants:
+            predecessor = value["predecessor"]
+            children[predecessor].add(identifier)
+            if predecessor is not None and predecessor not in records:
+                diagnostics.add("missing_predecessor")
     if any(len(ids) > 1 for ids in children.values()):
         diagnostics.add("fork")
-    if has_cycle(records):
+    if has_cycle(records, children):
         diagnostics.add("cycle")
     chain = []
-    current = children.get(None, [])
+    if any(len(variants) > 1 for variants in records.values()):
+        return diagnostics, chain
+    current = children.get(None, set())
     while len(current) == 1 and not diagnostics:
-        chain.append(current[0])
-        current = children.get(current[0], [])
+        identifier = next(iter(current))  # Singleton, never a winner-selection rule.
+        chain.append(identifier)
+        current = children.get(identifier, set())
     return diagnostics, chain
 
 
-def has_cycle(records: dict) -> bool:
-    finished = set()
-    for identifier in records:
-        active = set()
-        current = identifier
-        while current in records and current not in finished:
-            if current in active:
-                return True
-            active.add(current)
-            current = records[current]["predecessor"]
-        finished.update(active)
-    return False
+def has_cycle(records: dict, children: dict) -> bool:
+    """Peel the union graph iteratively; conflicts can supply multiple parents."""
+    incoming = dict.fromkeys(records, 0)
+    for parent, identifiers in children.items():
+        if parent in records:
+            for identifier in identifiers:
+                incoming[identifier] += 1
+    ready = [identifier for identifier, count in incoming.items() if count == 0]
+    visited = 0
+    while ready:
+        parent = ready.pop()
+        visited += 1
+        for identifier in children.get(parent, set()):
+            incoming[identifier] -= 1
+            if incoming[identifier] == 0:
+                ready.append(identifier)
+    return visited != len(records)
 
 
 def evidence_valid(contract: dict, value: dict) -> bool:
@@ -272,27 +318,37 @@ def evidence_valid(contract: dict, value: dict) -> bool:
     return result_rules[value["result"]]
 
 
-def contextual(contract: dict | None, observations: dict, chain: list[str], status: str) -> set[str]:
+def contextual(contracts: dict, observations: dict, chain: list[str], status: str) -> set[str]:
+    """Union evidence/binding errors over variants; never pick a representative."""
     diagnostics = set()
     if observations and status != "done":
         diagnostics.add("observations_on_unfinished")
-    if contract is None:
+    if len(contracts) != 1:
         return diagnostics | ({"orphan_observation"} if observations else set())
+    contract_id, candidates = next(iter(contracts.items()))  # Sole logical identity.
+    for variants in observations.values():
+        for value in variants:
+            if value["contract_id"] != contract_id:
+                diagnostics.add("orphan_observation")
+            elif any(not evidence_valid(contract, value) for contract in candidates):
+                diagnostics.add("invalid_evidence")
+    diagnostics.update(regression_errors(observations, chain))
+    return diagnostics
+
+
+def regression_errors(observations: dict, chain: list[str]) -> set[str]:
+    """Ancestry comparisons require an unambiguous complete observation chain."""
+    diagnostics = set()
     ancestors = set()
     for identifier in chain:
-        value = observations[identifier]
+        value = observations[identifier][0]  # graph() only returns single-variant chains.
         if value["result"] == "regressed":
             reference = value["regression_of"]
-            if reference not in ancestors or observations[reference]["result"] not in {"confirmed", "partially_confirmed"}:
+            if reference not in ancestors or observations[reference][0]["result"] not in {"confirmed", "partially_confirmed"}:
                 diagnostics.add("invalid_regression")
-            elif not regression_criteria_valid(observations[reference], value):
+            elif not regression_criteria_valid(observations[reference][0], value):
                 diagnostics.add("invalid_regression")
         ancestors.add(identifier)
-    for value in observations.values():
-        if value["contract_id"] != contract["record_id"]:
-            diagnostics.add("orphan_observation")
-        elif not evidence_valid(contract, value):
-            diagnostics.add("invalid_evidence")
     return diagnostics
 
 
@@ -309,31 +365,32 @@ def result(state: str, diagnostics: set[str], sources: dict, latest: str | None 
             "occurrences": sources, "action": actions.get(state, "FOLLOWUP_SUGGESTED")}
 
 
-def reconstruct(rows: list[dict], status: str, board: str, task_id: str) -> dict:
+def reconstruct(rows: object, status: str, board: str, task_id: str) -> dict:
     """Apply invalid > empty > unfinished > unobserved > unique-head precedence."""
-    total = sum(len(row.get("body", "").encode("utf-8")) for row in rows
-                if isinstance(row.get("body"), str))
-    if len(rows) > POLICY["max_comments"] or total > POLICY["max_history_bytes"]:
-        return result("invalid_history", {"history_limit"}, {})
-    records, sources, diagnostics = group(rows, board, task_id)
-    contracts = [value for value in records.values() if value["type"] == "contract"]
-    observations = {key: value for key, value in records.items() if value["type"] == "observation"}
+    if not isinstance(rows, list):
+        return result("invalid_history", {"malformed_native_response"}, {})
+    admitted, diagnostics = inspect_native(rows)
+    if "history_limit" in diagnostics:
+        return result("invalid_history", diagnostics, {})
+    records, sources, record_errors = group(admitted, board, task_id)
+    diagnostics.update(record_errors)
+    contracts = {key: variants for key, variants in records.items() if key.startswith("oc_")}
+    observations = {key: variants for key, variants in records.items() if key.startswith("oo_")}
     if len(contracts) > 1:
         diagnostics.add("multiple_contracts")
-    contract = contracts[0] if len(contracts) == 1 else None
     graph_errors, chain = graph(observations)
     diagnostics.update(graph_errors)
-    diagnostics.update(contextual(contract, observations, chain, status))
+    diagnostics.update(contextual(contracts, observations, chain, status))
     if diagnostics:
         return result("invalid_history", diagnostics, sources)
-    if not contract:
+    if not contracts:
         return result("untracked", set(), sources)
     if status != "done":
         return result("planned", set(), sources)
     if not chain:
         return result("awaiting_observation", set(), sources)
     latest = chain[-1]
-    return result(observations[latest]["result"], set(), sources, latest)
+    return result(observations[latest][0]["result"], set(), sources, latest)
 
 
 def evaluate_case(case: dict, golden: dict) -> dict:

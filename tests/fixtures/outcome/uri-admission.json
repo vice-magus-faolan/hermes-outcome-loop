@@ -1,0 +1,35 @@
+{
+  "rejected": [
+    "data:text/plain,synthetic-payload",
+    "See DATA:text/plain,synthetic-payload for evidence.",
+    "file:relative-evidence",
+    "file:/synthetic/evidence",
+    "mailto:observer@example.invalid",
+    "urn:example:synthetic-evidence",
+    "javascript:synthetic-call()",
+    "custom+evidence:synthetic-record",
+    "http://example.invalid/evidence",
+    "https:example.invalid/evidence"
+  ],
+  "allowed": [
+    "Result: confirmed; workflow completed at 12:30 UTC.",
+    "Observed 2026-10-02T00:00:00Z — ordinary prose.",
+    "See https://example.invalid/evidence/workflow for evidence.",
+    "https://example.invalid:443/evidence/workflow"
+  ],
+  "fields": [
+    {"base": "contract", "path": ["objective"]},
+    {"base": "contract", "path": ["expected_outcome"]},
+    {"base": "contract", "path": ["notes"]},
+    {"base": "contract", "path": ["criteria", 0, "description"]},
+    {"base": "contract", "path": ["timing", "observe_when"]},
+    {"base": "regressed", "path": ["summary"]},
+    {"base": "regressed", "path": ["environment"]},
+    {"base": "regressed", "path": ["artifact"]},
+    {"base": "regressed", "path": ["residual_risk", 0]},
+    {"base": "regressed", "path": ["evidence", 0, "summary"]},
+    {"base": "regressed", "path": ["evidence", 0, "baseline", "before"]},
+    {"base": "regressed", "path": ["evidence", 0, "baseline", "after"]},
+    {"base": "regressed", "path": ["evidence", 0, "baseline", "comparison"]}
+  ]
+}

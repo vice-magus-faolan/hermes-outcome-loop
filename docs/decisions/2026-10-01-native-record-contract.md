@@ -29,7 +29,9 @@ and historical NO-GO evidence remain unchanged.
    occurrence. Conflicting IDs, multiple contracts, roots/forks, missing links,
    cycles, or any marked unreadable/unsupported record invalidate the derived
    assessment. No timestamp/position/native-ID/lexicographic winner or automatic
-   reconciliation. Idempotency is logical, not atomic insertion uniqueness.
+   reconciliation. Diagnose all payload variants via union edges and every matching
+   contract/evidence variant, never a representative. Ancestry checks require an
+   unambiguous complete chain. Idempotency is logical, not atomic insertion uniqueness.
 4. Observation requires freshly read native `done`; any other status rejects it,
    including an identical retry. Criterion evidence, actual observation time,
    environment, conditional baseline and delivered artifact are explicit. Native
@@ -51,6 +53,10 @@ and historical NO-GO evidence remain unchanged.
    Unknown commit/readback outcomes never mean rollback or success; no blind retry.
    A canonical payload checksum detects changed meaning on later reads without
    remembering the original request; it is not authentication or an identity hash.
+   URI admission includes non-hierarchical schemes in every nested text field.
+   Native row/body/author/time validation precedes ignoring unrelated comments;
+   malformed input yields safe invalid-history diagnostics, not an exception or
+   untracked result. Rejected native rows are never copied into occurrence views.
 9. No completion hook, scheduler, crawler, database, persistent cache, automatic
    evidence ingestion, automatic follow-up or conflict resolver is required or
    included. Native execution remains independent when this plugin is absent.

@@ -16,6 +16,14 @@ Current executable specification:
 - `histories.json`: state/action matrix, logical retries, contract/observation conflicts,
   multiple contracts, concurrent forks/roots, missing predecessors, cycles, orphan
   and cross-target histories, unfinished status, invalid regression/artifact/baseline.
+  Mixed conflict/edge/evidence cases exercise all-variant diagnostic union, not just
+  summary-only conflicts; every invalid-history fixture is tested under permutations.
+- `native-responses.json`: malformed ordinary/marked native rows, missing/invalid
+  body/author/time, null/nonobject rows and lone-surrogate UTF-8 failures. Tests mix
+  these with valid histories, reject writes and exclude rejected rows from views.
+- `uri-admission.json`: hierarchical/non-hierarchical rejected URI forms applied to
+  every free-text field, including nested baselines, plus ordinary prose/UTC/clock
+  and safe HTTPS controls. Evidence/baseline pointer fields reject these forms too.
 - `scripts/outcome_spec.py`: bounded, test-only data oracle; no plugin registration,
   native dispatch, evidence I/O or persistence. Closed schema registry never fetches.
 - `tests/test_outcome_spec.py`: schema checks, byte-boundary/strict-JSON tests,
@@ -53,21 +61,30 @@ test-oracle output is never presented as a native API result.
 
 ## Builder verification evidence
 
-- Focused specification suite: 21 tests pass, including golden schemas, negative
-  shapes, invalid-history permutations, byte boundary and canonical checksum.
-- Canonical suite: 42 tests pass, including mandatory real-runtime Phase-0 probes.
+- Original proposed artifact: focused 21 tests and canonical 42 tests passed, but
+  independent review found three gaps. Passing that narrower suite was insufficient.
+- Remediation specification suite: 24 tests pass, including golden schemas, negative
+  shapes, mixed-conflict permutations and occurrence retention, recursive URI
+  admission, malformed native responses, byte boundary and canonical checksum.
+- Remediation canonical suite: 45 tests pass, including mandatory real-runtime Phase-0 probes.
 - RED/GREEN: the invalid-date fixture initially failed because a bare schema
   format annotation lacked an installed optional checker; explicit UTC calendar
   validation restores GREEN. A controlled checksum-check bypass makes the
   changed-meaning regression fail; restoring integrity validation restores GREEN.
   No temporary mutation is part of the artifact.
+- Review remediation RED/GREEN: new mixed-conflict/native-response/URI fixtures fail
+  against the previous oracle (wrong diagnostics, accepted URIs, false clean states
+  and uncaught attribute/Unicode errors). All pass after all-variant reconstruction,
+  scheme-token admission and staged native validation. Nonstring/unencodable stored
+  readback remains `write_unverified`; malformed provenance does not bypass byte caps.
 - Removing Phase-0 runtime prerequisites makes canonical verification fail with
   the required-runtime error, not skip. Running without site packages makes it
   fail on the missing schema dependency, not silently accept unchecked schemas.
-- Conservative complexity audit maximum is 15. The oracle's grouping/evidence/
-  contextual/preflight/reconstruction functions exceed the soft warning of 10:
-  they deliberately aggregate boundary diagnostics, exercised by golden/negative
-  histories and permutations; none exceeds 15. This is a test oracle, not a
+- Conservative complexity audit maximum is 15. The oracle's graph/evidence/
+  preflight/reconstruction functions exceed the soft warning of 10: they deliberately
+  aggregate boundary diagnostics, exercised by golden/negative histories and
+  permutations; none exceeds 15. Grouping, native validation and regression checks
+  are separate small functions. This is a test oracle, not a
   justification for copying diagnostic monoliths into production.
 - Source handoff and historical Phase-0 evidence are unchanged. No production
   plugin, remote CI, publication or live-installation success is claimed. The

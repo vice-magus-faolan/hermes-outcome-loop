@@ -35,10 +35,19 @@ any dispatch; never truncate evidence, IDs, JSON or native write payloads.
 
 Admission examines every string (including nested evidence/baseline fields). Reject
 known API-key/token/password/secret assignments, bearer credentials, private-key
-headers, known token prefixes and redaction sentinels. Reject URL-shaped content
+headers, known token prefixes and redaction sentinels. Reject URI-shaped content
 unless it is a credential-free HTTPS host/path pointer; no userinfo, query, fragment,
 percent-encoding, non-HTTPS scheme, or data/file pointer. Apply the same policy to
-URLs embedded in summaries, not just `pointer`. The schema deliberately admits a
+URIs embedded in summaries, not just `pointer`. Scheme tokens need not contain `//`:
+`data:text/plain,...`, `file:relative-path`, `mailto:...`, `urn:...` and other
+non-hierarchical schemes are rejected, including case variants. The lexical admission
+rule is a token-boundary ASCII scheme (`[A-Za-z][A-Za-z0-9+.-]*`) followed by a colon
+and non-whitespace content. Do not match a scheme inside an alphanumeric/dot/underscore/
+hyphen token; ISO UTC timestamps, clock times and prose labels like `Result: confirmed`
+remain ordinary text. An unspaced label such as `Result:confirmed` is URI-shaped and
+must be rewritten explicitly by the caller, never normalized silently. Apply admission
+recursively to all text fields, including baseline comparisons and residual risk.
+The schema deliberately admits a
 small ASCII host/path grammar; private coordinates and confidential path tokens
 remain the caller's responsibility. Do not persist raw logs, transcripts or arbitrary
 file contents. Prefer short reviewed summaries and safe evidence links. No regex can
@@ -122,13 +131,32 @@ are rejected. Unknown contract IDs, invalid history or unsupported versions prev
 new outcome writes. There is no hidden durable lock, sequence counter or database.
 
 Reconstruction groups complete parsed payloads by logical ID and preserves every
-native occurrence. Same ID/different payload is `conflicting_payload`. More than
+admitted native occurrence and every distinct payload variant. Same ID/different
+payload is `conflicting_payload`: never retain a first/last/sorted representative.
+More than
 one contract ID is `multiple_contracts`; an observation without its sole matching
 contract is `orphan_observation`. Build observation parent edges independently of
 input position/time/native IDs. Multiple first observations or multiple children of
 any predecessor are `fork`; nonexistent parent is `missing_predecessor`; parent
 loops including self-loops are `cycle`. These invalidate history, even when a
 separate valid chain exists. Cross-contract parents never constitute valid links.
+Diagnostics use an order-independent all-variant policy:
+
+- Build the union of predecessor edges across all observation variants. Identical
+  edges are deduplicated, not counted as forks; forks count distinct child logical IDs.
+  Report missing predecessors, forks and cycles in that union even alongside payload
+  conflicts. This describes structural ambiguity, not a selected interpretation.
+- With exactly one logical contract ID, check each matching observation variant
+  against every variant of that contract. If any such check fails, report
+  `invalid_evidence`; any observation variant naming another contract is orphaned.
+  With zero/multiple contract IDs, observations are orphaned and contract-dependent
+  evidence checks cannot run. Count contract identities, not retry/variant occurrences.
+- Ancestry-dependent regression comparisons require a complete unambiguous observation
+  chain: no graph errors and one payload per observation ID. Otherwise no chain/head
+  or ancestry comparison is chosen; the existing structural/conflict diagnostics
+  explain why. Independent evidence, binding, target and unfinished-status checks
+  still run. A contract payload conflict does not choose a contract variant for evidence.
+
 Diagnostic labels may be sorted for presentation; sorting must never select a head.
 If no graph diagnostics and a sole contract exists, a unique root-to-head chain is
 required. No automatic append-only reconciliation operation exists in MVP.
@@ -146,17 +174,29 @@ Inspect the actual native comment list, never the duplicated worker-context pros
 Ordinary comments do not define outcomes. Any body starting `[hermes-outcome:` is
 reserved: unsupported marker/version or malformed/sensitive/oversize payloads produce
 visible diagnostics even alongside valid records. A probe-version record on a real
-outcome root is unsupported, not silently upgraded. Missing/malformed native comment
-fields are also diagnosed. Do not echo rejected bodies or credential-like text.
+outcome root is unsupported, not silently upgraded. Validate native response structure
+BEFORE ignoring ordinary comments: the comments container must be a list, each row an
+object and each body a strictly UTF-8-encodable string. Unusable containers/rows/bodies
+are `malformed_native_response`, including lone surrogates; never throw an uncaught
+attribute/encoding exception or return clean untracked. For rows with usable bodies,
+author must be a nonblank UTF-8 string and `created_at` a nonnegative integer (not a
+boolean); missing/malformed attribution yields `missing_provenance`, even on unrelated
+comments. Rows failing either native admission stage are not decoded or copied into
+occurrence views. Retain every occurrence of admitted parsed records, including
+conflicting variants/retries; rejected rows produce safe diagnostic labels only.
+Do not echo rejected bodies or credential-like text.
 
 Limit each native read to 1,024 comments and 2,097,152 total UTF-8 body bytes for
 application reconstruction. Count all comments, including unrelated comments and
-retries; `history_limit` prevents partial reconstruction and blocks writes. Public
+retries, and count encodable bodies even when their provenance fails admission.
+An unencodable body cannot have a trusted byte count and independently invalidates
+history. `history_limit` prevents partial reconstruction and blocks writes. Public
 Kanban still materializes the thread before this check: this is not an allocation
 sandbox, pagination assumption or native size guarantee. Surface overflow, no
 truncation. All diagnostics suppress an unqualified `latest` result.
 
-Stable precedence (report all discoverable diagnostics, not just a chosen winner):
+Stable precedence (report all diagnostics discoverable under the admission/all-variant
+rules above, not just a chosen winner; overflow prevents record reconstruction):
 
 1. Marked malformed/unsupported, conflicting/ambiguous, orphan, provenance, target,
    evidence/regression or bounds errors => `invalid_history`, latest null.
