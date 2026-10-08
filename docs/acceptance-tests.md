@@ -38,11 +38,14 @@ Focused command:
 python3 -m unittest discover -s tests -p test_outcome_spec.py -v
 ```
 
-Canonical command remains `python3 scripts/verify.py`. Use a repo-local venv with
-`python3 -m pip install -r requirements-dev.txt`; do not modify Hermes/shared
-packages. Missing schema dependency is an error, never a skipped check. Preserve the
-explicit Phase-0 runtime prerequisites described in the findings. Schema meta/format
-validation must be offline; ordinary verification must not fetch docs or evidence.
+Canonical command remains `python3 scripts/verify.py`, now through the restricted
+Docker runner with an explicit pre-provisioned image content ID. See the
+[Docker source handoff](docker-integration.md); construction and current native
+acceptance remain blocked, not silently skipped. Repo-local schema/unit venvs do
+not substitute for native Docker checks. Missing schema dependency is an error.
+Historical Phase-0 prerequisites/results are preserved in the findings, but are
+not the current host-side execution path. Schema meta/format validation remains
+offline; ordinary verification does not fetch docs or evidence.
 
 The specification milestone's architecture checks constrain the oracle's
 imports/effects and the explicit tool/scope allowlist. They did not test the then
@@ -64,6 +67,15 @@ parser/adapter, not the oracle. Simultaneous fake-transport race tests are expli
 unit evidence, never production native integration or persisted native API results.
 Whole-history preservation, production restart/multi-profile/disabled behavior and
 supported packaging remain mandatory downstream gates.
+
+New mandatory `test_native.ProductionNativeTests` discovery covers real scoped
+public registration/dispatch, all results and regression, unfinished/retry rejection,
+full native history preservation, fresh profile/process reconstruction, actual
+parallel races and failure/admission/readback cases. The runner's own policy tests
+are separate from native evidence. These new native gates are UNEXERCISED pending
+budget-admitted construction; their discovery is not a successful run. Supported
+distribution plugin admission/consent remains downstream, not bypassed by the
+source-loader integration fixture.
 
 Production timing additionally requires `test_outcome_timing.py` through the same
 machine-readable map: both reviewed overflow reproducers, define/readback/retry

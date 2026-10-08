@@ -28,6 +28,10 @@ def results():
     paths = sorted((ROOT / "scripts").glob("phase0_*.py")) + [
         ROOT / "tests/fixtures/phase0_plugin/__init__.py", ROOT / "scripts/outcome_spec.py"]
     paths += sorted((ROOT / "hermes_outcome_loop").glob("*.py"))
+    paths += sorted((ROOT / "scripts").glob("native_*.py"))
+    paths += [ROOT / "scripts/docker_acceptance.py", ROOT / "scripts/container_policy.py",
+              ROOT / "scripts/docker_build_preflight.py", ROOT / "scripts/provision_docker.py",
+              ROOT / "tests/fixtures/native_plugin/__init__.py"]
     return [(str(path.relative_to(ROOT)), node.name, 1 + score(node))
             for path in paths for node in ast.walk(ast.parse(path.read_text()))
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))]

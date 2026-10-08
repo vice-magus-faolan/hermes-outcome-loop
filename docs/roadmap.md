@@ -1,8 +1,8 @@
 # MVP roadmap
 
-Phase 0 and ADR/schemas have independent exact-artifact review. The four-tool core
-is implemented and unit-tested, pending its exact-artifact review. Production native
-integration/packaging and repository delivery remain pending.
+Phase 0, ADR/schemas and the four-tool core have independent exact-artifact review.
+Docker integration source is prepared; construction peaks and actual native
+integration/packaging acceptance remain unresolved. Repository delivery is pending.
 
 1. **Phase 0 — public-interface feasibility.** Record installed Hermes version/full
    SHA, public API contracts and actual disposable-board probe results. Prove
@@ -23,6 +23,8 @@ integration/packaging and repository delivery remain pending.
    hook replay where applicable, exception/disabled-plugin paths, race/retry
    handling and preservation of pre-existing canonical history. Make required
    integration coverage part of the canonical verifier, not an optional claim.
+   The Docker-first [source handoff](docker-integration.md) preserves these gates;
+   runner smoke or source completion does not constitute native acceptance.
 5. **Packaging, docs and threat/failure analysis.** Supported plugin manifest and
    dependency admission; reproducible isolated install; concise exercised workflow
    examples; no live deployment. Canonical verification must cover all implemented

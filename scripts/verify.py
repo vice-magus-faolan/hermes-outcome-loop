@@ -2,16 +2,16 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Run repository checks; fail if discovery yields no tests or Phase 0 is no-go.
 
-Phase-0 integration requires HERMES_PHASE0_SOURCE and HERMES_PHASE0_PYTHON
-(an already provisioned Hermes dependency venv). Missing prerequisites and
-unsupported required interfaces fail, never skip. Schema/production unit checks
-require requirements-dev.txt in a repo-local environment. Production real-native
-integration remains a separate required downstream gate, not a Phase-0 claim.
+The host entry point requires an already-local HERMES_OUTCOME_IMAGE content ID.
+All required native tests run inside the restricted Docker acceptance runner.
+Missing images/dependencies and unsupported required interfaces fail, never skip.
 """
 from __future__ import annotations
 
 import ast
+import argparse
 import json
+import os
 from pathlib import Path
 import sys
 import unittest
@@ -40,6 +40,18 @@ def require_production_gates(identifiers: set[str]) -> None:
 
 def main() -> int:
     """Validate tracked source shapes and run the repository unittest suite."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--inside-docker", action="store_true")
+    args = parser.parse_args()
+    if not args.inside_docker:
+        from docker_acceptance import run
+        image = os.environ.get("HERMES_OUTCOME_IMAGE")
+        if not image:
+            print("ERROR: required pre-provisioned Docker image: HERMES_OUTCOME_IMAGE", file=sys.stderr)
+            return 1
+        return run(image)
+    from container_policy import require_container
+    require_container()
     from phase0_audit import main as audit_phase0
     if audit_phase0():
         return 1
@@ -52,6 +64,13 @@ def main() -> int:
         json.loads(path.read_text(encoding="utf-8"))
     suite = unittest.defaultTestLoader.discover(str(ROOT / "tests"))
     require_production_gates(test_ids(suite))
+    required_native = {
+        "test_native.ProductionNativeTests.test_results_retry_unfinished_and_full_native_history",
+        "test_native.ProductionNativeTests.test_restart_profiles_and_actual_parallel_races",
+        "test_native.ProductionNativeTests.test_fail_observationally_and_admission_readback",
+    }
+    if not required_native <= test_ids(suite):
+        raise RuntimeError("mandatory production-native integration discovery missing")
     count = suite.countTestCases()
     if count == 0:
         print("ERROR: no tests discovered", file=sys.stderr)

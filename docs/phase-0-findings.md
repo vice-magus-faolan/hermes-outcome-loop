@@ -1,5 +1,11 @@
 # Phase-0 public-interface findings
 
+Execution-path update, 2026-10-08: the findings and receipts below are preserved
+historical evidence, not a current host-side preparation instruction. The
+[Docker recovery decision](decisions/2026-10-08-docker-test-recovery.md) and
+[source handoff](docker-integration.md) govern new native runs. Docker construction
+and re-execution remain unaccepted; a runner smoke is not Phase-0 re-attestation.
+
 ## Current continuation — 2026-10-01
 
 **GO to independent Phase-0 review for the approved native-record direction.**

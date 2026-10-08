@@ -1,0 +1,8 @@
+# Allowlist the public-only provisioning inputs. No worktree, HOME or runtime copy.
+**
+!docker/
+!docker/Dockerfile
+!docker/debian.sources
+!scripts/
+!scripts/provision_docker.py
+!requirements.txt

@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Run a registered-plugin probe in a fresh, credential-free Hermes home.
 
-Requires HERMES_PHASE0_SOURCE (read-only installed source checkout) and
-HERMES_PHASE0_PYTHON (its already provisioned interpreter). No install/update,
+Requires the restricted Docker runner, HERMES_PHASE0_SOURCE (pinned read-only
+container source) and HERMES_PHASE0_PYTHON (its provisioned interpreter). No install/update,
 external LLM, gateway or private Kanban API occurs. A scripted loopback provider
 drives a real dispatcher worker; data writes still use native tools, not CLI.
 Evidence collection can succeed with feasibility=false; --require-feasible is
@@ -111,6 +111,8 @@ def cleanup_workers(base: Path) -> None:
 
 def collect(debug: bool = False) -> dict:
     """Collect sanitized facts only; destroy every disposable native record."""
+    from container_policy import require_container
+    require_container()
     source, interpreter = prerequisites()
     with tempfile.TemporaryDirectory(prefix="outcome-phase0-", dir=os.environ.get("TMPDIR")) as tmp:
         base = Path(tmp).resolve(strict=True)

@@ -82,3 +82,14 @@ If a prerequisite fails, document the smallest design adjustment and block nativ
 review/completion until the feasibility requirement is satisfied or the operator
 explicitly accepts a revised scope. Do not bypass the API boundary or alter Hermes
 source/configuration merely to make this plugin feasible.
+
+## Current integration recovery
+
+The [Docker recovery decision](decisions/2026-10-08-docker-test-recovery.md)
+supersedes active host-side native test preparation. Native feasibility,
+integration and downstream packaging run in disposable restricted Docker,
+with separate public-only provisioning and reviewed construction peak evidence.
+Unknown peaks are a blocker, not an estimate-based admission. Preserve failed
+attempts/partial preparation; do not mount or reconstruct them. See the
+[source handoff](docker-integration.md) for actual runner-only results and the
+still-unexercised native assertions. No prior evidence is rewritten into a pass.
