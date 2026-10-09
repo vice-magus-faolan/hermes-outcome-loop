@@ -12,9 +12,9 @@ import sqlite3
 def snapshot(base: Path, task_id: str) -> dict:
     """Reject symlink escapes; compare full history beyond public last-50 events."""
     root = base.resolve(strict=True)
-    if not root.name.startswith("outcome-phase0-"):
+    if not root.name.startswith("outcome-native-"):
         raise RuntimeError("snapshot is not disposable")
-    path = root / "board-root/kanban/boards/phase0/kanban.db"
+    path = root / "board-root/kanban/boards/outcome-test/kanban.db"
     if path.resolve(strict=True) != path or not path.is_relative_to(root):
         raise RuntimeError("snapshot path escaped disposable board")
     with closing(sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)) as connection:

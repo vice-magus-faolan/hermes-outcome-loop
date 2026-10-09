@@ -11,10 +11,8 @@ from pathlib import Path
 import subprocess
 import sys
 
-from native_probe import ROOT, install_fixture, validate_paths
-from phase0_runtime import require
-from phase0_snapshot import snapshot, preserved
-from docker_acceptance import HERMES_SHA
+from native_support import ROOT, install_fixture, validate_paths, require, HERMES_SHA
+from native_snapshot import snapshot, preserved
 
 
 class NativeInterface:
@@ -43,23 +41,23 @@ class NativeInterface:
 
     def create(self) -> str:
         return self.native("kanban_create", title="Disposable production-native acceptance",
-                           assignee="phase0-a", board="phase0", completion_contract="local-only")["task_id"]
+                           assignee="outcome-test-a", board="outcome-test", completion_contract="local-only")["task_id"]
 
     def complete(self, task: str) -> None:
-        self.native("kanban_complete", task_id=task, board="phase0", summary="Disposable native completion")
-        require(self.native("kanban_show", task_id=task, board="phase0")["task"]["status"] == "done",
+        self.native("kanban_complete", task_id=task, board="outcome-test", summary="Disposable native completion")
+        require(self.native("kanban_show", task_id=task, board="outcome-test")["task"]["status"] == "done",
                 "native completion not visible")
 
     def payload(self, name: str, task: str) -> dict:
         value = copy.deepcopy(json.loads((ROOT / "tests/fixtures/outcome/golden.json").read_text())[name])
         value.pop("payload_sha256")
-        value.update(board="phase0", task_id=task)
+        value.update(board="outcome-test", task_id=task)
         if value["type"] == "observation":
             value["observed_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         return value
 
     def outcome(self, name: str, task: str, payload: dict | None = None) -> dict:
-        arguments: dict = {"board": "phase0", "task_id": task}
+        arguments: dict = {"board": "outcome-test", "task_id": task}
         if payload is not None:
             arguments["contract" if name == "outcome_define" else "observation"] = payload
         return self.call(name, arguments, allow_error=True)
@@ -67,7 +65,7 @@ class NativeInterface:
     def reopen(self, task: str, action: str, profile: str, payload: dict | None = None,
                enabled: bool = True, reuse_profile: bool = False) -> dict:
         env = install_fixture(self.base, profile, enabled, reuse_profile)
-        args = [sys.executable, "-B", str(ROOT / "scripts/native_runtime.py"), str(self.source),
+        args = [sys.executable, "-B", str(ROOT / "tests/native/native_runtime.py"), str(self.source),
                 str(self.base), task, action, json.dumps(payload)]
         result = subprocess.run(args, env=env, cwd=self.base, capture_output=True, text=True, timeout=40)
         require(result.returncode == 0, "fresh native process failed: " + action)
@@ -84,12 +82,12 @@ def delivered_cases(api: NativeInterface) -> dict:
     rejected = api.outcome("outcome_observe", task, api.payload("confirmed", task))
     require(rejected["error"] == "unfinished_task", "unfinished native observation admitted")
     require(preserved(before_reject, snapshot(api.base, task), 0), "unfinished rejection mutated native data")
-    install_fixture(api.base, "phase0-b")
-    api.native("kanban_request_review", task_id=task, board="phase0", reviewer="phase0-b",
+    install_fixture(api.base, "outcome-test-b")
+    api.native("kanban_request_review", task_id=task, board="outcome-test", reviewer="outcome-test-b",
                summary="Disposable builder handoff")
-    require(api.native("kanban_show", task_id=task, board="phase0")["task"]["status"] == "review",
+    require(api.native("kanban_show", task_id=task, board="outcome-test")["task"]["status"] == "review",
             "native review transition missing")
-    api.reopen(task, "complete", "phase0-b", reuse_profile=True)
+    api.reopen(task, "complete", "outcome-test-b", reuse_profile=True)
     before = snapshot(api.base, task)
     require(any(row["kind"] == "review_requested" for row in before["events"]), "review event missing")
     require(any(row["outcome"] == "completed" for row in before["runs"]), "native completion run missing")
@@ -102,9 +100,9 @@ def delivered_cases(api: NativeInterface) -> dict:
     require(api.outcome("outcome_observe", task, regressed)["view"]["state"] == "regressed", "genuine native regression failed")
     require(api.outcome("outcome_observe", task, confirmed)["acknowledgment"] == "identical_retry", "old observation retry appended")
     require(preserved(before, snapshot(api.base, task), 2), "native delivery provenance changed")
-    comments = api.native("kanban_show", task_id=task, board="phase0")["comments"]
+    comments = api.native("kanban_show", task_id=task, board="outcome-test")["comments"]
     expected = api.outcome("outcome_show", task)["view"]
-    for profile in ("phase0-restart-a", "phase0-restart-b"):
+    for profile in ("outcome-test-restart-a", "outcome-test-restart-b"):
         actual = api.reopen(task, "show", profile)
         require(actual["view"] == expected and actual["comments"] == comments, "profile/restart history diverged")
     for name in ("partial", "failed", "inconclusive"):
@@ -126,21 +124,21 @@ def fresh_action(api: NativeInterface, task: str, action: str, value: dict | Non
     """Isolated process-level readers/reviewers, not alternate outcome persistence."""
     if action == "show":
         return {"view": api.outcome("outcome_show", task)["view"],
-                "comments": api.native("kanban_show", task_id=task, board="phase0")["comments"]}
+                "comments": api.native("kanban_show", task_id=task, board="outcome-test")["comments"]}
     if action == "complete":
-        require(api.native("kanban_show", task_id=task, board="phase0")["task"]["status"] == "review", "native review not visible")
+        require(api.native("kanban_show", task_id=task, board="outcome-test")["task"]["status"] == "review", "native review not visible")
         api.complete(task)
         return {"completed": True}
     if action == "race":
         api.call("native_test_control", {"mode": "race"})
         return api.outcome("outcome_observe", task, value)
     if action == "disabled":
-        missing = api.call("outcome_show", {"board": "phase0", "task_id": task}, allow_error=True)
+        missing = api.call("outcome_show", {"board": "outcome-test", "task_id": task}, allow_error=True)
         require("error" in missing, "production plugin unexpectedly enabled")
         for name, arguments in (("kanban_request_review", {"summary": "Disabled plugin review"}),
                                 ("kanban_complete", {"summary": "Disabled plugin completion"})):
-            api.call(name, {"board": "phase0", "task_id": task, **arguments})
-        state = api.call("kanban_show", {"board": "phase0", "task_id": task})
+            api.call(name, {"board": "outcome-test", "task_id": task, **arguments})
+        state = api.call("kanban_show", {"board": "outcome-test", "task_id": task})
         require(state["task"]["status"] == "done", "disabled plugin blocked native work")
         return {"completed": True}
     raise RuntimeError("unknown fresh action")

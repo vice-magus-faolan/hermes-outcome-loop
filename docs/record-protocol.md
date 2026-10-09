@@ -1,9 +1,8 @@
 # Outcome record protocol v1
 
-Normative companion to the [native-record ADR](decisions/2026-10-01-native-record-contract.md).
 The [JSON schemas](../schemas/) define shape; the rules below define semantics.
-The [core source implementation](core-implementation.md) follows this specification;
-production-native integration, packaging and installation remain separate gates.
+The production implementation is in `hermes_outcome_loop`. Outcome records remain
+native comments; no independent outcome store or execution lifecycle is defined.
 
 ## Encoding and admission
 
@@ -219,7 +218,7 @@ identify safe logical record/criterion IDs, not rejected payloads.
 
 ## Tools, board fences and persisted acknowledgment
 
-Proposed signatures:
+Tool signatures:
 
 - `outcome_define(board, task_id, contract)`
 - `outcome_show(board, task_id)`

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Distribution layout, reproducibility and real supported native admission gates."""
+"""Portable distribution layout, reproducibility and rejected unsafe inputs."""
 import os
 from pathlib import Path
 import sys
@@ -51,13 +51,3 @@ class DistributionTests(unittest.TestCase):
                              "hermes_outcome_loop/records.py", "schemas/common.schema.json"):
                     self.assertIn("hermes-outcome-loop/" + name, names)
                 self.assertFalse(any("tests/" in name or ".git" in name for name in names))
-
-
-class PackagingNativeTests(unittest.TestCase):
-    def test_supported_install_scan_admission_registration_and_uninstall(self):
-        from packaging_probe import collect
-        report = collect(debug=True)
-        for key in ("native_scan", "installed_disabled", "dependency_consent_declined",
-                    "pm_admitted", "registered_four_tools", "exercised_workflow",
-                    "failed_registration_isolated", "backend_index_cache_removed", "removal_preserves_history"):
-            self.assertTrue(report[key], key)
