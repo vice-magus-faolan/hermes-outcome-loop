@@ -24,7 +24,7 @@ class DockerHarnessTests(unittest.TestCase):
                      "--cpus=2", "--memory=2g", "--memory-swap=2g", "--pids-limit=256", "--pull=never",
                      "--user=65532:65532", "--log-driver=local", "--log-opt=max-size=1m", "--log-opt=max-file=1"):
             self.assertIn(item, args)
-        self.assertIn("/scratch:rw,nosuid,nodev,size=536870912,mode=1777", args)
+        self.assertIn("/scratch:rw,exec,nosuid,nodev,size=1073741824,mode=1777", args)
         self.assertEqual([x for x in args if x.startswith("type=bind")],
                          ["type=bind,src=/staged/source,dst=/source,readonly"])
         self.assertNotIn("--privileged", args)

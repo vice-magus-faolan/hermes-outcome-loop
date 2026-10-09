@@ -5,4 +5,6 @@
 !docker/debian.sources
 !scripts/
 !scripts/provision_docker.py
+!scripts/provision_packaging.py
+!plugin.yaml
 !requirements.txt

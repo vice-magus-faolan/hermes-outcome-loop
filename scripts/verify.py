@@ -68,6 +68,9 @@ def main() -> int:
         "test_native.ProductionNativeTests.test_results_retry_unfinished_and_full_native_history",
         "test_native.ProductionNativeTests.test_restart_profiles_and_actual_parallel_races",
         "test_native.ProductionNativeTests.test_fail_observationally_and_admission_readback",
+        "test_packaging.PackagingNativeTests.test_supported_install_scan_admission_registration_and_uninstall",
+        "test_packaging.DistributionTests.test_directory_plugin_has_closed_reproducible_distribution",
+        "test_packaging.DistributionTests.test_incomplete_symlink_and_existing_output_fail_closed",
     }
     if not required_native <= test_ids(suite):
         raise RuntimeError("mandatory production-native integration discovery missing")

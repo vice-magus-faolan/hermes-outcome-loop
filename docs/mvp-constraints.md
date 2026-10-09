@@ -5,7 +5,8 @@ where the original handoff is ambiguous. Phase-0 evidence has independent review
 The [native-record ADR](decisions/2026-10-01-native-record-contract.md),
 [v1 record protocol](record-protocol.md) and [acceptance mapping](acceptance-tests.md)
 specify independently reviewed implementation decisions. The core implementation
-is pending its own exact-artifact review and downstream production-native acceptance.
+and production-native integration have independent exact-artifact review; packaging
+and cumulative delivery review remain separate gates.
 
 ## Authority and failure
 

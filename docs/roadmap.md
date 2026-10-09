@@ -2,7 +2,7 @@
 
 Phase 0, ADR/schemas and the four-tool core have independent exact-artifact review.
 Docker construction and actual native integration pass canonical verification;
-independent integration review and packaging remain pending. Unknown build peaks
+integration has independent review; packaging/cumulative delivery review remain pending. Unknown build peaks
 are not a construction approval gate. Repository delivery is pending.
 
 1. **Phase 0 — public-interface feasibility.** Record installed Hermes version/full

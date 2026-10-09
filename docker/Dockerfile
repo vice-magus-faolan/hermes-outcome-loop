@@ -10,6 +10,10 @@ RUN apt-get -o Acquire::Check-Valid-Until=false update && \
 ENV HOME=/provision PYTHONDONTWRITEBYTECODE=1 OUTCOME_DOCKER_PROVISION=f42f579cf8bac4918ac9599bece71618afadd846
 COPY scripts/provision_docker.py requirements.txt /provision/
 RUN python3 -B /provision/provision_docker.py
+COPY plugin.yaml /provision/plugin/plugin.yaml
+COPY scripts/provision_packaging.py /provision/provision_packaging.py
+RUN /opt/runtime/bin/python -B /provision/provision_packaging.py
+
 ENV HOME=/scratch/home TMPDIR=/scratch
 ENV HERMES_PHASE0_SOURCE=/opt/hermes HERMES_PHASE0_PYTHON=/opt/runtime/bin/python
 USER 65532:65532

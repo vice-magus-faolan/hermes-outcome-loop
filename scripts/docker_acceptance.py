@@ -69,7 +69,7 @@ def create_command(name: str, image: str, source: Path, smoke: bool = False) -> 
             "--memory=2g", "--memory-swap=2g", "--pids-limit=256",
             "--log-driver=local", "--log-opt=max-size=1m", "--log-opt=max-file=1",
             "--log-opt=compress=false",
-            "--tmpfs", "/scratch:rw,nosuid,nodev,size=536870912,mode=1777",
+            "--tmpfs", "/scratch:rw,exec,nosuid,nodev,size=1073741824,mode=1777",
             "--mount", f"type=bind,src={source},dst=/source,readonly", "--workdir=/source",
             "--env=HOME=/scratch/home", "--env=TMPDIR=/scratch",
             "--env=PYTHONDONTWRITEBYTECODE=1", "--env=HERMES_DISABLE_LAZY_INSTALLS=true",
@@ -117,7 +117,7 @@ def verify_limits(item: dict, source: Path) -> None:
     mounts = item["Mounts"]
     if len(mounts) != 1 or mounts[0]["Source"] != str(source) or mounts[0]["Destination"] != "/source" or mounts[0]["RW"]:
         raise RuntimeError("engine source mount mismatch")
-    if host.get("Tmpfs") != {"/scratch": "rw,nosuid,nodev,size=536870912,mode=1777"}:
+    if host.get("Tmpfs") != {"/scratch": "rw,exec,nosuid,nodev,size=1073741824,mode=1777"}:
         raise RuntimeError("engine scratch budget mismatch")
 
 
