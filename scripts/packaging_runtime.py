@@ -147,6 +147,18 @@ def install_checks(cli: list[str], directory: Path, pin: str, base: Path) -> Pat
     return target
 
 
+def clear_index_metadata(base: Path) -> int:
+    """Force missing index metadata in this disposable seed, retaining wheel bytes."""
+    cache = base / "host-home/.hermes/cache/uv"
+    require(cache.resolve(strict=True).is_relative_to(base.resolve(strict=True)), "cache metadata escaped disposable root")
+    entries = [entry for entry in cache.iterdir() if entry.name.startswith(("simple-v", "flat-index-v"))]
+    for entry in entries:
+        require(not entry.is_symlink() and entry.is_dir(), "cache metadata escaped disposable root")
+    for entry in entries:
+        shutil.rmtree(entry)
+    return len(entries)
+
+
 def failure_and_removal(cli: list[str], target: Path, task: str, view: dict, source: Path, base: Path) -> None:
     before = snapshot(base, task)
     schema = target / "schemas/common.schema.json"
@@ -157,6 +169,7 @@ def failure_and_removal(cli: list[str], target: Path, task: str, view: dict, sou
     finally:
         schema.write_bytes(contents)
     require(fresh(source, base, "show", task) == view, "fresh installed reconstruction differs")
+    require(clear_index_metadata(base) > 0, "backend index cache regression was not exercised")
     command(cli + ["plugins", "disable", NAME], base)
     require(fresh(source, base, "disabled", task)["task"]["status"] == "done", "disable lost native records")
     command(cli + ["plugins", "remove", NAME], base)
@@ -192,7 +205,8 @@ def main() -> None:
     failure_and_removal(cli, target, task, view, source, base)
     print(json.dumps({key: True for key in ("native_scan", "installed_disabled", "dependency_consent_declined",
                                           "pm_admitted", "registered_four_tools", "exercised_workflow",
-                                          "failed_registration_isolated", "removal_preserves_history")}, sort_keys=True))
+                                          "failed_registration_isolated", "backend_index_cache_removed",
+                                          "removal_preserves_history")}, sort_keys=True))
 
 
 if __name__ == "__main__":

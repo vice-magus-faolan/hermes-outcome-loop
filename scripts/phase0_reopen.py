@@ -44,7 +44,7 @@ def main():
         initial = call("kanban_show", {"task_id": task_id, "board": "phase0"})
         race_count = len(initial["comments"])
         (root / ("race-ready-" + os.environ["HERMES_PROFILE"])).touch()
-        deadline = time.monotonic() + 10
+        deadline = float(os.environ["OUTCOME_PHASE0_RACE_DEADLINE"])
         while not (root / "race-release").exists():
             if time.monotonic() >= deadline:
                 raise RuntimeError("disposable race barrier timed out")

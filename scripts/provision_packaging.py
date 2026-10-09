@@ -17,6 +17,7 @@ from urllib.request import urlopen
 
 from packaging.requirements import Requirement
 from packaging.version import Version
+from packaging.utils import canonicalize_name
 
 BASE = Path("/scratch/outcome-phase0-native-packaging")
 if os.environ.get("OUTCOME_DOCKER_PROVISION") != "f42f579cf8bac4918ac9599bece71618afadd846":
@@ -43,7 +44,7 @@ sys.path.insert(0, "/opt/hermes")
 import pm
 from pm.plugin_inputs import Candidates
 pm.sync_venv(plugins=Candidates([plugin]), explicit=True)
-# PM's supported index knobs keep backend resolution independent of HTTP cache age.
+# uv sync does not accept UV_NO_INDEX; use PM's supported local default index.
 # Fetch public wheel bytes only; do not pip-edit any managed runtime.
 wheelhouse = Path("/provision/packaging-wheelhouse")
 wheelhouse.mkdir()
@@ -64,6 +65,11 @@ for text in [*requirements, "packaging"]:
     if hashlib.sha256(body).hexdigest() != wheel["digests"]["sha256"]:
         raise RuntimeError("public backend wheel digest mismatch")
     (wheelhouse / Path(wheel["filename"]).name).write_bytes(body)
+    index = wheelhouse / "simple" / canonicalize_name(requirement.name)
+    index.mkdir(parents=True)
+    (index / "index.html").write_text(
+        f'<a href="../../{wheel["filename"]}#sha256={wheel["digests"]["sha256"]}">{wheel["filename"]}</a>\n',
+        encoding="utf-8")
 seed = Path("/provision/packaging-seed")
 seed.mkdir()
 for name in ("cache", "installs", "tools"):

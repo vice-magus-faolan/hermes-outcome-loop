@@ -71,6 +71,15 @@ def main() -> int:
         "test_packaging.PackagingNativeTests.test_supported_install_scan_admission_registration_and_uninstall",
         "test_packaging.DistributionTests.test_directory_plugin_has_closed_reproducible_distribution",
         "test_packaging.DistributionTests.test_incomplete_symlink_and_existing_output_fail_closed",
+        "test_packaging_regressions.PackagingRegressionTests.test_index_cache_removal_keeps_distribution_bytes",
+        "test_packaging_regressions.PackagingRegressionTests.test_index_cache_removal_refuses_symlink_escape",
+        "test_packaging_regressions.ProfileBarrierRegressionTests.test_child_failure_is_not_reported_as_barrier_timeout",
+        "test_packaging_regressions.ProfileBarrierRegressionTests.test_late_startup_uses_shared_deadline",
+        "test_packaging_regressions.ProfileBarrierRegressionTests.test_race_child_receives_same_deadline_and_finite_timeout",
+        "test_packaging_regressions.ProfileBarrierRegressionTests.test_shared_deadline_still_bounds_barrier",
+        "test_phase0.NativeProbeTests.test_causal_worker_failure_and_storage_details",
+        "test_phase0.NativeProbeTests.test_exercised_native_boundaries",
+        "test_phase0.NativeProbeTests.test_required_phase0_feasibility",
     }
     if not required_native <= test_ids(suite):
         raise RuntimeError("mandatory production-native integration discovery missing")

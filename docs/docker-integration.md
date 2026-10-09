@@ -1,7 +1,8 @@
 # Docker native-integration report
 
-Status: pinned image construction and 101-test canonical native suite pass;
-independent integration review and supported packaging remain pending.
+Status: pinned image construction and native integration have independent review.
+The cumulative 110-test suite passes, including supported packaging and missing
+backend-index-metadata removal coverage; final packaging review remains pending.
 The [Docker recovery decision](decisions/2026-10-08-docker-test-recovery.md)
 governs this path. Historical native feasibility/core approvals and failed host
 preparation are preserved; they are not retroactive container acceptance.
@@ -22,7 +23,7 @@ preparation are preserved; they are not retroactive container acceptance.
   actual installed distribution inventory. No pip mutation of a live or immutable
   environment is used. Actual provisioning and native imports passed.
 - `.dockerignore` permits only the Docker recipe, frozen OS source declaration,
-  provisioning script and schema requirements. It excludes host environments,
+  provisioning scripts, plugin manifest and schema requirements. It excludes host environments,
   partial preparation, profiles, credentials and the candidate worktree.
 
 Public network acquisition belongs only to explicit image construction. Acceptance
@@ -73,7 +74,9 @@ That fence prevents accidental host execution; it is not a Python security sandb
 
 The runner applies and reads back non-root UID/GID 65532, read-only root/source,
 network `none`, dropped capabilities, no-new-privileges, two CPUs, 2 GiB RAM/no
-extra swap, 256 PIDs and 512 MiB tmpfs. The container deadline is 20 minutes;
+extra swap, 256 PIDs and 1 GiB executable scratch tmpfs (the packaging seed and
+native PM generations require writable/executable scratch; see the packaging
+report). The container deadline is 20 minutes;
 Docker logs have one 1 MiB uncompressed local file, exported output is bounded
 at 2 MiB, and stdout receipts are compact. Loopback scripted provider traffic for
 historical dispatcher tests remains inside the network-denied namespace. There
@@ -107,7 +110,8 @@ The test loader copies unchanged production source and its schemas into disposab
 profile directories and uses normal public discovery/enablement. Only its fault shim
 and race barrier are test behavior; native operations are real, not mocked. This
 is source registration integration, NOT supported distribution install/scan/consent
-or packaging acceptance. That remains the existing downstream packaging gate.
+or packaging acceptance. The separate [packaging gate](packaging.md) now exercises
+supported native installation, scans, consent, PM selection and removal.
 No native scan/consent routine is suppressed or patched. Any normal discovery or
 registration rejection fails the native checks; it is not bypassed.
 
@@ -143,7 +147,8 @@ Evidence completeness does not establish evidence truth or universal secret dete
   successful and failed acceptance runs. No test containers remain.
 - Missing-image/runtime failures and host execution fences remain explicit.
   The CI source uses ordinary bounded provisioning and the same mandatory suite;
-  remote CI, supported packaging/install/consent and publication are unexercised.
+  remote CI and publication are unexercised. Supported packaging/install/consent
+  are exercised separately in the cumulative canonical suite.
 
 The two original failed integration runs and partial host output remain untouched.
 The original preparer source was committed for recoverability before being replaced

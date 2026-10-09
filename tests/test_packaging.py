@@ -59,5 +59,5 @@ class PackagingNativeTests(unittest.TestCase):
         report = collect(debug=True)
         for key in ("native_scan", "installed_disabled", "dependency_consent_declined",
                     "pm_admitted", "registered_four_tools", "exercised_workflow",
-                    "failed_registration_isolated", "removal_preserves_history"):
+                    "failed_registration_isolated", "backend_index_cache_removed", "removal_preserves_history"):
             self.assertTrue(report[key], key)

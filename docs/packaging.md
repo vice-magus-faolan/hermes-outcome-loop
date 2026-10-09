@@ -94,8 +94,17 @@ manual immutable-runtime pip edits, or upstream patches. PM does not forward
 `UV_OFFLINE` during admission; an unseeded graph may require network and is not
 claimed to work offline. Missing/incompatible seeds fail, never skip.
 Public backend wheels are provisioned with PyPI digest checks. Supported native
-`UV_NO_INDEX`/`UV_FIND_LINKS` settings prevent disable/removal from relying on
-time-sensitive backend index caches; no PM command or consent is overridden.
+`UV_DEFAULT_INDEX` points to a static local package index over those wheels.
+The pinned uv's `sync --help` does not expose `UV_NO_INDEX` as an environment
+setting: forwarding that variable plus `UV_FIND_LINKS` alone still allowed PyPI
+lookups. Pass-through diagnostics confirmed the settings reached both the actual
+PM worker and uv; the failure was not missing PM forwarding. No PM command,
+source, lock, build isolation or consent is overridden by the local index.
+Before native disable, acceptance deliberately deletes the disposable uv
+`simple-v*` and `flat-index-v*` metadata buckets while retaining cached distribution
+bytes. The real native disable/remove/history assertions must then pass with no
+network. This tests missing metadata, not merely a freshly seeded HTTP cache;
+it is not a promise of offline operation without the complete seed and index.
 
 Acceptance uses 1 GiB executable bounded scratch tmpfs for the writable cache and
 dependency generations, retaining 2 GiB RAM/no extra swap and all other candidate
@@ -107,9 +116,15 @@ packaging gate proves four-tool/no-hook registration, definition/completion,
 confirmation/stable retry/regression, fresh reconstruction, missing-schema loader
 failure isolation, native disable/remove and exact native history preservation.
 
-Local restricted-Docker canonical verification passed all 104 discovered tests,
-including the complete native packaging gate. An earlier repeated run failed
-during native disable when cached backend index metadata expired; that failure
-is retained in native run evidence, not treated as a pass. The public wheelhouse
-fix removes this cache-age dependency. Independent exact-artifact review and
-remote CI remain separate obligations; no live installation was performed.
+Local restricted-Docker canonical verification passed all 110 discovered tests,
+including the missing-index-metadata native packaging gate and six narrow cache/
+profile-barrier regressions. Earlier repeated runs failed during native disable
+when cached backend index metadata expired; those failures remain native run
+evidence, not passes. The local-index correction passes after metadata removal.
+The two-profile Phase-0 race now shares one 45-second startup/read-barrier deadline
+with both children, within finite 60-second child calls and the unchanged outer
+test deadline. Failed children surface their primary errors before a generic
+barrier timeout; peers are released on failure. Actual shared-predecessor appends,
+fork/no-winner and native provenance assertions remain mandatory. Independent
+exact-artifact review and remote CI remain separate obligations; no live
+installation was performed.

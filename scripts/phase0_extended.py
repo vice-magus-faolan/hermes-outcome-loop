@@ -120,12 +120,15 @@ def profile_env(base, profile, enabled=True):
     return env
 
 
-def reopen(source, base, task, action="read", profile="phase0-b", body=None):
+def reopen(source, base, task, action="read", profile="phase0-b", body=None, race_deadline=None):
     args = [sys.executable, "-B", str(ROOT / "scripts/phase0_reopen.py"), str(source), str(base), task, action]
     if body is not None:
         args.append(body)
-    result = subprocess.run(args, cwd=base, env=profile_env(base, profile, action != "disabled"),
-                            capture_output=True, text=True, timeout=30)
+    env = profile_env(base, profile, action != "disabled")
+    if race_deadline is not None:
+        env["OUTCOME_PHASE0_RACE_DEADLINE"] = str(race_deadline)
+    result = subprocess.run(args, cwd=base, env=env,
+                            capture_output=True, text=True, timeout=60 if action == "race" else 30)
     require(result.returncode == 0, "fresh-process public operation failed: " + result.stderr)
     return json.loads(result.stdout)
 
@@ -151,18 +154,33 @@ def profile_probe(call, create, source, base):
             "identical_history": True, "retry_provenance": True, "plugin_disabled_completion": True}
 
 
+def wait_race_readers(base, futures, deadline):
+    """Distinguish a failed child from slow imports before releasing real appends."""
+    profiles = ("phase0-a", "phase0-b")
+    while not all((base / ("race-ready-" + profile)).exists() for profile in profiles):
+        for future in futures:
+            if future.done():
+                future.result()  # Preserve the primary native child error.
+                raise RuntimeError("real-profile race child exited before release")
+        pending = [profile for profile in profiles if not (base / ("race-ready-" + profile)).exists()]
+        require(time.monotonic() < deadline, "real-profile race did not reach read barrier: " + ", ".join(pending))
+        time.sleep(0.01)
+
+
 def race_probe(call, create, source, base):
     """Two real profiles read the same predecessor, then append without a lock."""
     task = create()
     call("kanban_comment", task_id=task, board="phase0", body=logical("z"))
+    # One startup+barrier deadline shared with both children; not two independent
+    # ten-second clocks. Two native imports compete under the two-CPU ceiling.
+    deadline = time.monotonic() + 45
     with ThreadPoolExecutor(max_workers=2) as executor:
-        futures = [executor.submit(reopen, source, base, task, "race", profile, logical(identifier, "z"))
+        futures = [executor.submit(reopen, source, base, task, "race", profile, logical(identifier, "z"), deadline)
                    for profile, identifier in (("phase0-a", "a"), ("phase0-b", "m"))]
-        deadline = time.monotonic() + 10
-        while not all((base / ("race-ready-" + profile)).exists() for profile in ("phase0-a", "phase0-b")):
-            require(time.monotonic() < deadline, "real-profile race did not reach read barrier")
-            time.sleep(0.01)
-        (base / "race-release").touch()
+        try:
+            wait_race_readers(base, futures, deadline)
+        finally:
+            (base / "race-release").touch()  # Unblock peers even on primary failure.
         results = [future.result() for future in futures]
     require(all(result["race_read_comments"] == 1 for result in results), "race did not share predecessor snapshot")
     rows = call("kanban_show", task_id=task, board="phase0")["comments"]
