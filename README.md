@@ -1,6 +1,6 @@
 # Hermes Outcome Loop
 
-**Status: Phase-0, ADR/schemas and four-tool core independently reviewed. Docker integration source prepared, but native construction/acceptance and packaging remain blocked. No live installation.**
+**Status: Phase-0, ADR/schemas and four-tool core independently reviewed. Docker native integration passes canonical verification; independent integration review and packaging remain pending. No live installation.**
 
 A small native-Hermes extension for **objective → delivery → observed outcome**.
 Native Hermes Kanban remains the sole execution authority. Outcome contracts and
@@ -16,7 +16,7 @@ there is no independent outcome database or scheduler.
 - [Approved logical-ordering amendment](docs/decisions/2026-10-01-record-ordering.md) — logical predecessor reconstruction, not timestamp ordering
 - [Native-record ADR](docs/decisions/2026-10-01-native-record-contract.md), [record protocol](docs/record-protocol.md) and [acceptance-to-test map](docs/acceptance-tests.md) — reviewed implementation contract
 - [Core implementation](docs/core-implementation.md) — source interfaces, unit/architecture coverage, safe errors and downstream gates
-- [Docker integration source handoff](docs/docker-integration.md) — exercised runner mechanics, unknown construction budget and unexercised native gates
+- [Docker integration report](docs/docker-integration.md) — pinned build, restricted execution and actual native results
 - [Contributor and agent boundaries](AGENTS.md)
 
 The source package implements `outcome_define`, `outcome_show`, `outcome_observe`,
@@ -26,11 +26,14 @@ installation instructions belong to the downstream integration/packaging gates.
 
 ## Verification
 
-Canonical verification requires a separately provisioned, budget-admitted Docker
-image. Image construction is currently blocked by unknown peaks; do not restart
-the interrupted host preparer. See the Docker handoff before any provisioning.
+Canonical verification requires a separately provisioned Docker image. Confirm
+the actual backing mounts and check the 2 GiB operational reserve before building;
+unknown peaks are not a pre-build approval gate. Do not restart the interrupted
+host preparer. See the Docker report for provisioning and execution boundaries.
 
 ```sh
+python3 scripts/docker_build_preflight.py
+timeout --signal=TERM --kill-after=30s 1800s docker build --tag outcome-integration:local --file docker/Dockerfile .
 export HERMES_OUTCOME_IMAGE="$(docker image inspect outcome-integration:local --format '{{.Id}}')"
 python3 scripts/verify.py
 ```
@@ -41,8 +44,8 @@ harness safety regressions, the mandatory registered-plugin/disposable-board
 feasibility probe and new production-native integration gates. The restricted
 runner supplies pinned container-only `HERMES_PHASE0_SOURCE` and
 `HERMES_PHASE0_PYTHON`; it does not mount installed host Hermes. Missing images or
-runtime prerequisites fail, never skip. The new native cases are authored but
-unexercised; current canonical acceptance is not green.
+runtime prerequisites fail, never skip. The current Docker suite passes 101 tests,
+including mandatory production-native integration and original Phase-0 gates.
 
 The resumed suite exercises logical predecessor reconstruction, real registered
 plugin dispatch in headless and dispatcher-spawned CLI worker contexts, native

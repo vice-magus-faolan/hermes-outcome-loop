@@ -1,8 +1,9 @@
 # MVP roadmap
 
 Phase 0, ADR/schemas and the four-tool core have independent exact-artifact review.
-Docker integration source is prepared; construction peaks and actual native
-integration/packaging acceptance remain unresolved. Repository delivery is pending.
+Docker construction and actual native integration pass canonical verification;
+independent integration review and packaging remain pending. Unknown build peaks
+are not a construction approval gate. Repository delivery is pending.
 
 1. **Phase 0 — public-interface feasibility.** Record installed Hermes version/full
    SHA, public API contracts and actual disposable-board probe results. Prove

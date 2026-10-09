@@ -52,12 +52,11 @@ class DockerHarnessTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 runner.stage_files(source, base / "overflow", ["safe.py"], limit=1)
 
-    def test_unknown_build_budget_is_not_a_capacity_pass(self):
-        with self.assertRaisesRegex(RuntimeError, "unknown"):
-            runner.require_budget(10 * 1024**3, None)
+    def test_operational_reserve_without_invented_peak(self):
         with self.assertRaisesRegex(RuntimeError, "reserve"):
-            runner.require_budget(3 * 1024**3, 2 * 1024**3)
-        runner.require_budget(5 * 1024**3, 2 * 1024**3)
+            runner.require_reserve(3 * 1024**3, 2 * 1024**3)
+        runner.require_reserve(5 * 1024**3, 2 * 1024**3)
+        runner.require_reserve(5 * 1024**3)
 
     def test_teardown_failure_keeps_primary_exit(self):
         self.assertEqual(runner.final_status(7, ["cleanup failed"]), 7)
@@ -75,16 +74,16 @@ class DockerHarnessTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             runner.owned_identity(item)
 
-    def test_construction_stores_share_one_filesystem_reserve(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            base = Path(tmp)
-            with patch.object(preflight.shutil, "disk_usage") as usage:
-                usage.return_value.free = 5 * 1024**3
-                with self.assertRaisesRegex(RuntimeError, "reserve"):
-                    preflight.aggregate_stores({"docker": base, "containerd": base},
-                                               {"docker": 2 * 1024**3, "containerd": 2 * 1024**3})
-                with self.assertRaisesRegex(RuntimeError, "unknown"):
-                    preflight.aggregate_stores({"docker": base}, {"docker": None})
+    def test_preflight_checks_accessible_mount_not_private_subdirectory(self):
+        with patch.object(sys, "argv", ["preflight", "--store", "/accessible"]), \
+                patch.object(preflight, "command", return_value='{"DockerRootDir":"/accessible"}'), \
+                patch.object(preflight.shutil, "disk_usage") as usage:
+            usage.return_value.free = 5 * 1024**3
+            preflight.main()
+            usage.assert_called_once_with(Path("/accessible"))
+            usage.return_value.free = 1024**3
+            with self.assertRaisesRegex(RuntimeError, "reserve"):
+                preflight.main()
 
     def test_host_cannot_opt_into_native_with_a_flag(self):
         import container_policy

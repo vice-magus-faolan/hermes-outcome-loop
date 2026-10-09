@@ -88,8 +88,10 @@ source/configuration merely to make this plugin feasible.
 The [Docker recovery decision](decisions/2026-10-08-docker-test-recovery.md)
 supersedes active host-side native test preparation. Native feasibility,
 integration and downstream packaging run in disposable restricted Docker,
-with separate public-only provisioning and reviewed construction peak evidence.
-Unknown peaks are a blocker, not an estimate-based admission. Preserve failed
+with separate public-only provisioning and ordinary finite-deadline builds.
+The continuation authorizes local construction without measured-peak approval;
+check actual backing-mount space and retain a 2 GiB operational reserve, not a
+claimed quota or fit guarantee. Unknown peaks remain unknown. Preserve failed
 attempts/partial preparation; do not mount or reconstruct them. See the
-[source handoff](docker-integration.md) for actual runner-only results and the
-still-unexercised native assertions. No prior evidence is rewritten into a pass.
+[integration report](docker-integration.md) for actual results and native
+assertions. No prior evidence is rewritten into a pass.

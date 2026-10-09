@@ -105,7 +105,10 @@ def cleanup_workers(base: Path) -> None:
             if expected not in environment or os.getpgid(pid) != pid:
                 continue  # never signal a recycled or non-fixture process
             os.killpg(pid, signal.SIGKILL)
-        except (FileNotFoundError, ProcessLookupError):
+        except (FileNotFoundError, ProcessLookupError, PermissionError):
+            # A reaped/zombie or non-dumpable process may deny environ even to
+            # this UID. Never signal an unverifiable PID or mask the probe error;
+            # the owned container is the final descendant-teardown boundary.
             pass
 
 

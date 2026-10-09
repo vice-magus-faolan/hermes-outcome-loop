@@ -2,6 +2,11 @@
 
 Status: operator-approved implementation direction, 2026-10-08.
 
+Continuation amendment: the operator subsequently authorized ordinary bounded
+local Docker builds and actual product tests, without a pre-build measured-peak
+or quota approval. Docker is the test environment, not a separate deliverable.
+The operational reserve and acceptance/effect boundaries below remain intact.
+
 ## Decision
 
 Resume the existing integration component and serial feature lane. Run Hermes
@@ -50,14 +55,13 @@ containerd and build-cache storage paths and their backing filesystems before
 image acquisition or construction. A separate Docker data directory does not
 necessarily relocate containerd image content/snapshots.
 
-A lightweight restricted-container smoke has passed. Heavyweight construction
-remains unexercised. Before construction, document dependency/image/build peaks,
-log/export budgets and filesystem reserves. Unknown construction peaks stay
-unknown: do not treat an image-size estimate, resource flags or a monitoring
-loop as an enforceable aggregate disk quota. Refuse a predictably unsafe local
-build. If fit or containment cannot be established, finish the small source
-handoff and report the concrete storage/runner decision rather than repeatedly
-allocating environments or expanding test infrastructure.
+Check free space on the accessible actual backing mounts, not root-owned data
+subdirectories, and retain the operational reserve. Ordinary finite-deadline
+project builds and meaningful retries are authorized. Record observed usage
+after execution; unknown peaks remain unknown and are not an admission blocker.
+Neither resource flags nor monitoring constitute an aggregate disk quota or a
+guaranteed fit. Diagnose concrete dependency/test failures on the same lane;
+do not add an infrastructure prerequisite or helper-review chain.
 
 Use initial acceptance ceilings of two CPUs, 2 GiB RAM with no extra swap,
 256 PIDs, 512 MiB temporary scratch and a 20-minute deadline; changes require a

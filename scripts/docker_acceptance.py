@@ -34,12 +34,10 @@ def validate_image(image: str) -> None:
         raise ValueError("candidate must be a literal local sha256 image ID")
 
 
-def require_budget(available: int, peak: int | None) -> None:
-    """A measured peak or enforceable upper bound is required before construction."""
-    if peak is None or type(peak) is not int or peak <= 0:
-        raise RuntimeError("construction peak unknown; choose a budgeted runner/storage")
-    if available - peak < RESERVE:
-        raise RuntimeError("construction would violate the 2 GiB reserve")
+def require_reserve(available: int, requested: int = 0) -> None:
+    """Operational headroom only, not a construction quota or fit guarantee."""
+    if available - requested < RESERVE:
+        raise RuntimeError("operation would violate the 2 GiB reserve")
 
 
 def stage_files(source: Path, target: Path, names: list[str], limit: int = SOURCE_LIMIT) -> None:
@@ -165,7 +163,7 @@ def check_candidate(image: str, smoke: bool) -> None:
 def run(image: str, smoke: bool = False) -> int:
     """Keep primary failure even on teardown failure; never delete images or volumes."""
     check_candidate(image, smoke)
-    require_budget(shutil.disk_usage(os.environ["TMPDIR"]).free, SOURCE_LIMIT + 2 * 1024**2)
+    require_reserve(shutil.disk_usage(os.environ["TMPDIR"]).free, SOURCE_LIMIT + 2 * 1024**2)
     names = command(["git", "-C", str(ROOT), "ls-files", "--cached", "--others", "--exclude-standard", "-z"]).split("\0")
     identity = None
     primary = 1

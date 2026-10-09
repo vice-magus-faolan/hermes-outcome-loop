@@ -92,6 +92,28 @@ class HarnessSafetyTests(unittest.TestCase):
             with self.assertRaises(subprocess.TimeoutExpired):
                 probe.run_child([sys.executable, str(script)], base, {}, timeout=0.1)
 
+    def test_unverifiable_worker_is_not_signalled_or_a_masked_primary_error(self):
+        with tempfile.TemporaryDirectory(dir=os.environ.get("TMPDIR")) as tmp:
+            base = Path(tmp)
+            (base / "worker-pids.jsonl").write_text('{"pid":123}\n')
+            with patch.object(Path, "read_bytes", side_effect=PermissionError), \
+                    patch.object(probe.os, "killpg") as kill:
+                probe.cleanup_workers(base)
+                kill.assert_not_called()
+
+    def test_native_module_launcher_needs_no_executable_scratch_shim(self):
+        sys.path.insert(0, str(ROOT / "scripts"))
+        extended = load_script("phase0_extended")
+        with tempfile.TemporaryDirectory(dir=os.environ.get("TMPDIR")) as tmp:
+            base = Path(tmp)
+            home = base / "profile"
+            home.mkdir()
+            with patch.dict(os.environ, {"HERMES_HOME": str(home), "HERMES_BIN": "/ambient/shim"}):
+                env = extended.worker_config(base, ROOT, "http://127.0.0.1:1/v1")
+            self.assertNotIn("HERMES_BIN", env)
+            self.assertFalse((base / "hermes-fixture").exists())
+            self.assertEqual(env["PYTHONPATH"], str(ROOT))
+
     def test_json_record_is_deterministic_and_unicode_safe(self):
         import json
         body = runtime.record(1, "caf\u00e9\nquoted \"evidence\"")
@@ -118,7 +140,7 @@ class NativeProbeTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.report = probe.collect()
+        cls.report = probe.collect(debug=True)
 
     def test_exercised_native_boundaries(self):
         report = self.report

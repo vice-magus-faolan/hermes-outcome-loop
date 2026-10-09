@@ -1,10 +1,14 @@
 # Phase-0 public-interface findings
 
-Execution-path update, 2026-10-08: the findings and receipts below are preserved
+Execution-path update, 2026-10-09: the findings and receipts below are preserved
 historical evidence, not a current host-side preparation instruction. The
 [Docker recovery decision](decisions/2026-10-08-docker-test-recovery.md) and
-[source handoff](docker-integration.md) govern new native runs. Docker construction
-and re-execution remain unaccepted; a runner smoke is not Phase-0 re-attestation.
+[integration report](docker-integration.md) govern new native runs. The actual
+pinned Docker build and 101-test canonical suite now pass, including the original
+required real Phase-0 worker/observer/record tests and new production-native gates.
+This is fresh builder execution evidence, not retroactive acceptance of the failed
+host runs or independent integration review. Packaging, publication and pilot
+remain separately gated; a runner smoke alone is not Phase-0 re-attestation.
 
 ## Current continuation — 2026-10-01
 

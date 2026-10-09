@@ -49,7 +49,10 @@ def failure_cases(api):
     token = "sk-" + "SYNTHETIC_NOT_A_SECRET_1234567890"
     api.native("kanban_comment", task_id=sensitive, board="phase0", body=json.dumps({"synthetic": token}))
     stored = api.native("kanban_show", task_id=sensitive, board="phase0")["comments"][-1]["body"]
-    require(token not in stored and "REDACTED" in stored, "native synthetic redaction not exercised")
+    # The pinned public writer uses a six-character head/four-character tail
+    # display mask, not a REDACTED sentinel. Assert the actual stored JSON value.
+    require(token not in stored and json.loads(stored)["synthetic"] == token[:6] + "..." + token[-4:],
+            "native synthetic redaction not exercised")
     require(preserved(baseline, snapshot(api.base, sensitive), 1), "native redaction changed completion")
     return {"disabled_malformed_raised_isolation": True, "read_write_readback_failures": True,
             "sensitive_size_stored_readback": True}

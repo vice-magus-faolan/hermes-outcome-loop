@@ -40,8 +40,8 @@ python3 -m unittest discover -s tests -p test_outcome_spec.py -v
 
 Canonical command remains `python3 scripts/verify.py`, now through the restricted
 Docker runner with an explicit pre-provisioned image content ID. See the
-[Docker source handoff](docker-integration.md); construction and current native
-acceptance remain blocked, not silently skipped. Repo-local schema/unit venvs do
+[Docker integration report](docker-integration.md); current native acceptance
+passes real execution, not a silent skip. Repo-local schema/unit venvs do
 not substitute for native Docker checks. Missing schema dependency is an error.
 Historical Phase-0 prerequisites/results are preserved in the findings, but are
 not the current host-side execution path. Schema meta/format validation remains
@@ -65,15 +65,16 @@ boundary to actual test IDs. Canonical verification requires every named gate to
 be discovered; removing one fails closed. These tests exercise the production
 parser/adapter, not the oracle. Simultaneous fake-transport race tests are explicitly
 unit evidence, never production native integration or persisted native API results.
-Whole-history preservation, production restart/multi-profile/disabled behavior and
-supported packaging remain mandatory downstream gates.
+Whole-history preservation and production restart/multi-profile/disabled behavior
+are exercised by the mandatory native gates below; supported packaging remains
+downstream.
 
 New mandatory `test_native.ProductionNativeTests` discovery covers real scoped
 public registration/dispatch, all results and regression, unfinished/retry rejection,
 full native history preservation, fresh profile/process reconstruction, actual
 parallel races and failure/admission/readback cases. The runner's own policy tests
-are separate from native evidence. These new native gates are UNEXERCISED pending
-budget-admitted construction; their discovery is not a successful run. Supported
+are separate from native evidence. These native gates passed in the restricted
+Docker environment as part of the 101-test canonical suite. Supported
 distribution plugin admission/consent remains downstream, not bypassed by the
 source-loader integration fixture.
 

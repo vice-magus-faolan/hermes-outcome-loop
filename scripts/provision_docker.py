@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Public-only Docker BUILD provisioning, never a host preparer or live installer.
 
-The Docker construction budget must already be admitted by the operator/runner.
 This script is not called by acceptance. PM builds a fresh dependency closure;
 no immutable environment is patched with pip and no source lock is modified.
 """

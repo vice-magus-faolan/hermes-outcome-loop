@@ -5,7 +5,6 @@ from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 from pathlib import Path
-import shlex
 import shutil
 import statistics
 import subprocess
@@ -221,12 +220,11 @@ def worker_config(base, source, url):
         "agent:\n  api_max_retries: 1\n  max_turns: 4\nupdates:\n  check: false\n"
         "toolsets: [kanban, phase0_probe]\nplatform_toolsets:\n  cli: [kanban, phase0_probe]\n"
         "tools:\n  tool_search:\n    enabled: off\nplugins:\n  enabled: [phase0-probe]\n", encoding="utf-8")
-    wrapper = base / "hermes-fixture"
-    wrapper.write_text("#!/bin/sh\nexec " + shlex.quote(sys.executable) +
-                       " -B -m hermes_cli.main \"$@\"\n", encoding="utf-8")
-    wrapper.chmod(0o755)
     env = dict(os.environ)
-    env.update(HERMES_BIN=str(wrapper), PYTHONPATH=str(source), HERMES_DISABLE_LAZY_INSTALLS="true",
+    # Let native dispatch choose the running interpreter's module launcher.
+    # Docker's scratch tmpfs is noexec; no executable test shim is necessary.
+    env.pop("HERMES_BIN", None)
+    env.update(PYTHONPATH=str(source), HERMES_DISABLE_LAZY_INSTALLS="true",
                OPENAI_API_KEY="synthetic-loopback-only", NO_COLOR="1", TERM="dumb")
     return env
 
@@ -269,11 +267,13 @@ def worker_probe(call, create, source, base, sibling, other):
     with ScriptedProvider({"sibling": sibling, "other": other}) as provider:
         env = worker_config(base, source, provider.base_url)
         # Public dispatcher launcher only: never CLI data writes or private mutation APIs.
-        result = subprocess.run([sys.executable, "-B", "-m", "hermes_cli.main", "kanban", "dispatch", "--max", "1", "--json"],
+        result = subprocess.run([sys.executable, "-B", "-m", "hermes_cli.main", "kanban", "--board", "phase0", "dispatch", "--max", "1", "--json"],
                                 cwd=base, env=env, capture_output=True, text=True, timeout=40)
         require(result.returncode == 0, "public dispatcher launch failed: " + result.stderr)
         dispatched = json.loads(result.stdout)
-        require(any(item["task_id"] == task for item in dispatched["spawned"]), "public dispatcher did not spawn probe")
+        require(any(item["task_id"] == task for item in dispatched["spawned"]),
+                "public dispatcher did not spawn probe: " + json.dumps(dispatched) +
+                "; native launch error: " + str(call("kanban_show", task_id=task, board="phase0")["task"]["last_failure_error"]))
         state, occurrence = wait_worker(call, task, base)
         report = json.loads(occurrence["body"].split("\n", 1)[1])
         require(report["passed"] and report["profile"] == "phase0-a" and occurrence["author"] == "phase0-a",

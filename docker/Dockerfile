@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# PUBLIC provisioning only. Do not build before actual storage peak admission.
+# PUBLIC provisioning only; acceptance runs separately without networking.
 FROM python:3.14.0-slim-bookworm@sha256:9bbb8720ae0a24a6ca8dd678bfdf57818fe70caf54c52a53ec01d8db43405056
 LABEL org.hermes-outcome-loop.hermes-sha="f42f579cf8bac4918ac9599bece71618afadd846"
 LABEL org.hermes-outcome-loop.test="disposable-acceptance-v1"
