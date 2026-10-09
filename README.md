@@ -53,8 +53,9 @@ timeout --signal=TERM --kill-after=10s 300s docker run --rm --init --pull=never 
 Build a portable directory and deterministic archive with
 `python3 scripts/package_plugin.py --output dist` (stdlib only; choose a new output
 directory for each build). Test helpers, Docker and development dependencies are
-not shipped in the plugin. Contributor boundaries remain in `AGENTS.md`; its
-historical planning references are preserved in Git history, not active product docs.
+not shipped in the plugin. `AGENTS.md` remains unchanged, including its obsolete
+bootstrap statements. Its required original brief and product-reference documents
+are retained; this cleanup removes experimental harness and recovery documentation.
 
 ## License
 
