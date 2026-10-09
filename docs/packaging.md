@@ -93,6 +93,9 @@ and actual PM-selected environment activation. There are no registry shortcuts,
 manual immutable-runtime pip edits, or upstream patches. PM does not forward
 `UV_OFFLINE` during admission; an unseeded graph may require network and is not
 claimed to work offline. Missing/incompatible seeds fail, never skip.
+Public backend wheels are provisioned with PyPI digest checks. Supported native
+`UV_NO_INDEX`/`UV_FIND_LINKS` settings prevent disable/removal from relying on
+time-sensitive backend index caches; no PM command or consent is overridden.
 
 Acceptance uses 1 GiB executable bounded scratch tmpfs for the writable cache and
 dependency generations, retaining 2 GiB RAM/no extra swap and all other candidate
@@ -103,3 +106,10 @@ Scratch is a test bound, not a production timeout or disk-fit guarantee. The
 packaging gate proves four-tool/no-hook registration, definition/completion,
 confirmation/stable retry/regression, fresh reconstruction, missing-schema loader
 failure isolation, native disable/remove and exact native history preservation.
+
+Local restricted-Docker canonical verification passed all 104 discovered tests,
+including the complete native packaging gate. An earlier repeated run failed
+during native disable when cached backend index metadata expired; that failure
+is retained in native run evidence, not treated as a pass. The public wheelhouse
+fix removes this cache-age dependency. Independent exact-artifact review and
+remote CI remain separate obligations; no live installation was performed.

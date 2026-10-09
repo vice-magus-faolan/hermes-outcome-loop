@@ -24,6 +24,8 @@ def collect(debug: bool = False) -> dict:
         env = install_fixture(base, "phase0-a", enabled=False)
         env["PYTHONPATH"] = str(source)
         env["HERMES_PHASE0_SOURCE"] = str(source)
+        env["UV_NO_INDEX"] = "true"
+        env["UV_FIND_LINKS"] = "/provision/packaging-wheelhouse"
         env["HERMES_RUNTIME_DIR"] = str(base / "host-home/.hermes/tools")
         code, output, errors = run_child([str(interpreter), "-B", str(ROOT / "scripts/packaging_runtime.py"),
                                          str(source), str(base)], base, env, timeout=600)
