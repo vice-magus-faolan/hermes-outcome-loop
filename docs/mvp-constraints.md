@@ -1,8 +1,12 @@
 # Reviewed MVP constraints
 
 Approved bootstrap direction: 2026-09-30. These clarifications take precedence
-where the original handoff is ambiguous. The implementation ADR and schemas
-remain pending Phase-0 evidence and independent review.
+where the original handoff is ambiguous. Phase-0 evidence has independent review.
+The [native-record ADR](decisions/2026-10-01-native-record-contract.md),
+[v1 record protocol](record-protocol.md) and [acceptance mapping](acceptance-tests.md)
+specify independently reviewed implementation decisions. The core implementation
+and production-native integration have independent exact-artifact review; packaging
+and cumulative delivery review remain separate gates.
 
 ## Authority and failure
 
@@ -26,9 +30,17 @@ remain pending Phase-0 evidence and independent review.
 - Use an explicit version marker and deterministic JSON schema. Contract and
   observation records require stable identifiers. Observation calls need an explicit
   retry key/ID, plus contract identity, so later genuine observations remain distinct.
-- Sort by native comment IDs, not timestamp alone. Report malformed records,
-  unsupported versions, orphan observations and same-ID/different-payload conflicts.
-  Do not silently label an unreadable history `untracked` or claim success from it.
+- Reconstruct observations by stable logical record IDs and explicit predecessor
+  references persisted in native comments, independent of returned comment order.
+  Native comment IDs are not required and timestamps are not ordering authority.
+  A unique valid chain has a determinable latest observation; concurrent branches,
+  missing predecessors, cycles and same-ID/different-payload conflicts produce
+  visible ambiguity/invalid-history diagnostics, never an invented winner.
+  Report malformed records, unsupported versions and orphan observations.
+  Preserve each native author/time occurrence when grouping identical retries;
+  do not silently collapse contradictory provenance. Do not label unreadable or
+  ambiguous history `untracked` or claim an unqualified successful outcome.
+  See the [approved ordering amendment](decisions/2026-10-01-record-ordering.md).
 - Concurrent read/append is not an atomic uniqueness operation. The ADR must document
   logical deduplication and conflict reporting using native records, with no hidden
   lock/database becoming authoritative. Race and retry tests are required.
@@ -41,6 +53,12 @@ remain pending Phase-0 evidence and independent review.
 - Free-text `observe_when` is descriptive. Only report overdue when a declared
   absolute deadline or a supported externally supplied anchor is known; otherwise
   state `awaiting observation; due time unknown`. No invented deployment timestamp.
+- Timing arithmetic must remain readable across the full admitted UTC calendar
+  and delay ranges. An anchor+delay beyond year 9999 is reported separately as
+  `derived_due_out_of_range`, never clamped or treated as invalid history. Any
+  absolute deadline wins over that later bound; without one the outcome is not
+  yet due for any supported clock, with null due timestamp and an explicit range
+  message. Missing anchors remain distinct from known out-of-range derived bounds.
 - Evidence maps to criteria. Claims of improvement need a baseline/comparison where
   appropriate. Distinguish a verification check from post-delivery outcome evidence.
 - Prefer evidence pointers and concise summaries. Never automatically read repository
@@ -54,8 +72,8 @@ remain pending Phase-0 evidence and independent review.
 ## Scope
 
 No dashboard, scheduler, fleet crawler, automatic remediation, lifecycle interception,
-or extra task database. Omit a completion hook unless Phase 0 shows a concrete need;
-correctness derives from fresh native reads even if hooks are absent or replayed.
+or extra task database. Omit the completion hook: Phase 0 found incorrect cross-board
+routing and synchronous caller delay; correctness derives from explicit fresh reads.
 The four proposed tools are sufficient. Follow-up work is suggested, never created.
 
 ## Phase-0 stop rule
@@ -65,3 +83,16 @@ If a prerequisite fails, document the smallest design adjustment and block nativ
 review/completion until the feasibility requirement is satisfied or the operator
 explicitly accepts a revised scope. Do not bypass the API boundary or alter Hermes
 source/configuration merely to make this plugin feasible.
+
+## Current integration recovery
+
+The [Docker recovery decision](decisions/2026-10-08-docker-test-recovery.md)
+supersedes active host-side native test preparation. Native feasibility,
+integration and downstream packaging run in disposable restricted Docker,
+with separate public-only provisioning and ordinary finite-deadline builds.
+The continuation authorizes local construction without measured-peak approval;
+check actual backing-mount space and retain a 2 GiB operational reserve, not a
+claimed quota or fit guarantee. Unknown peaks remain unknown. Preserve failed
+attempts/partial preparation; do not mount or reconstruct them. See the
+[integration report](docker-integration.md) for actual results and native
+assertions. No prior evidence is rewritten into a pass.

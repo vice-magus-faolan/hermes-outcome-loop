@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+manifest_version: 2
+name: hermes-outcome-loop
+version: "0.1.0"
+kind: standalone
+description: Append-only outcome contracts and observations on native Kanban delivery roots
+license: GPL-3.0-or-later
+author: Faolan
+homepage: https://github.com/vice-magus-faolan/hermes-outcome-loop
+provides_tools: [outcome_define, outcome_show, outcome_observe, outcome_check]
+provides_hooks: []
+capabilities: []
+python_dependencies:
+  - jsonschema==4.25.1
+  - referencing==0.37.0

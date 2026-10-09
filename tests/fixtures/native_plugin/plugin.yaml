@@ -1,0 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: outcome-native-test
+version: "0.1.0"
+description: Disposable production-source integration loader; not distribution packaging

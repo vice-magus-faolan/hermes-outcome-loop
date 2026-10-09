@@ -1,0 +1,2 @@
+# Verification exercises the exact runtime schema dependencies.
+-r requirements.txt

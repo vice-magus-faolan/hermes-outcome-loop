@@ -1,6 +1,9 @@
 # MVP roadmap
 
-This roadmap describes pending work; it does not claim delivery.
+Phase 0, ADR/schemas and the four-tool core have independent exact-artifact review.
+Docker construction and actual native integration pass canonical verification;
+integration has independent review; packaging/cumulative delivery review remain pending. Unknown build peaks
+are not a construction approval gate. Repository delivery is pending.
 
 1. **Phase 0 — public-interface feasibility.** Record installed Hermes version/full
    SHA, public API contracts and actual disposable-board probe results. Prove
@@ -10,6 +13,8 @@ This roadmap describes pending work; it does not claim delivery.
 2. **ADR and schemas.** Use Phase-0 findings to approve the native-record design,
    immutable contract/observation schemas, IDs/retries/concurrency, derived-state
    precedence, diagnostics, native provenance, board scope and timing rules.
+   See the [ADR](decisions/2026-10-01-native-record-contract.md),
+   [protocol](record-protocol.md) and [acceptance mapping](acceptance-tests.md).
 3. **Core plugin and unit/architecture tests.** Implement four tools and a narrow
    native-tool adapter; no hook needed for correctness. Exercise every result,
    malformed history, redaction, duplicate/conflict, failed read/write/readback,
@@ -19,6 +24,8 @@ This roadmap describes pending work; it does not claim delivery.
    hook replay where applicable, exception/disabled-plugin paths, race/retry
    handling and preservation of pre-existing canonical history. Make required
    integration coverage part of the canonical verifier, not an optional claim.
+   The Docker-first [source handoff](docker-integration.md) preserves these gates;
+   runner smoke or source completion does not constitute native acceptance.
 5. **Packaging, docs and threat/failure analysis.** Supported plugin manifest and
    dependency admission; reproducible isolated install; concise exercised workflow
    examples; no live deployment. Canonical verification must cover all implemented
