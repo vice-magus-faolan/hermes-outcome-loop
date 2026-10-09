@@ -1,10 +1,6 @@
-# Allowlist the public-only provisioning inputs. No worktree, HOME or runtime copy.
+# Build only the public dependency inputs, never a host home or worktree state.
 **
 !docker/
 !docker/Dockerfile
 !docker/debian.sources
-!scripts/
-!scripts/provision_docker.py
-!scripts/provision_packaging.py
-!plugin.yaml
 !requirements.txt

@@ -5,20 +5,20 @@ import copy
 import json
 import time
 
-from phase0_runtime import require
-from phase0_snapshot import snapshot, preserved
+from native_support import require
+from native_snapshot import snapshot, preserved
 
 
 def ordinary_delivery(api, task):
-    api.native("kanban_request_review", task_id=task, board="phase0", summary="Native work survives outcome failure")
+    api.native("kanban_request_review", task_id=task, board="outcome-test", summary="Native work survives outcome failure")
     api.complete(task)
 
 
 def failure_cases(api):
     disabled = api.create()
-    require(api.reopen(disabled, "disabled", "phase0-disabled", enabled=False)["completed"], "disabled path failed")
+    require(api.reopen(disabled, "disabled", "outcome-test-disabled", enabled=False)["completed"], "disabled path failed")
     malformed = api.create()
-    api.native("kanban_comment", task_id=malformed, board="phase0", body="[hermes-outcome:v1]\n{")
+    api.native("kanban_comment", task_id=malformed, board="outcome-test", body="[hermes-outcome:v1]\n{")
     require(api.outcome("outcome_show", malformed)["view"]["state"] == "invalid_history", "malformed metadata hidden")
     ordinary_delivery(api, malformed)
     callback = api.create()
@@ -47,8 +47,8 @@ def failure_cases(api):
     require(not api.outcome("outcome_define", sensitive, payload)["ok"], "oversize admitted")
     require(preserved(baseline, snapshot(api.base, sensitive), 0), "admission rejection wrote native records")
     token = "sk-" + "SYNTHETIC_NOT_A_SECRET_1234567890"
-    api.native("kanban_comment", task_id=sensitive, board="phase0", body=json.dumps({"synthetic": token}))
-    stored = api.native("kanban_show", task_id=sensitive, board="phase0")["comments"][-1]["body"]
+    api.native("kanban_comment", task_id=sensitive, board="outcome-test", body=json.dumps({"synthetic": token}))
+    stored = api.native("kanban_show", task_id=sensitive, board="outcome-test")["comments"][-1]["body"]
     # The pinned public writer uses a six-character head/four-character tail
     # display mask, not a REDACTED sentinel. Assert the actual stored JSON value.
     require(token not in stored and json.loads(stored)["synthetic"] == token[:6] + "..." + token[-4:],
@@ -59,7 +59,7 @@ def failure_cases(api):
 
 
 def parallel_observations(api, task, payloads, index):
-    profiles = [f"phase0-race-{index}-{suffix}" for suffix in ("a", "b")]
+    profiles = [f"outcome-test-race-{index}-{suffix}" for suffix in ("a", "b")]
     release = api.base / "release"
     release.unlink(missing_ok=True)
     with ThreadPoolExecutor(max_workers=2) as executor:

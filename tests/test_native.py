@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Mandatory real-Hermes integration plus harness path fences. No silent skips."""
+"""Real registered-plugin behavior, history preservation and isolated test paths."""
 import os
 from pathlib import Path
 import sys
@@ -8,17 +8,17 @@ import unittest
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "scripts"))
-from native_probe import collect, install_fixture, validate_paths
+sys.path.insert(0, str(ROOT / "tests/native"))
+from native_support import collect, install_fixture, validate_paths
 
 
 class NativeSafetyTests(unittest.TestCase):
     def test_fixture_environment_discards_live_worker_credentials(self):
-        with tempfile.TemporaryDirectory(prefix="outcome-phase0-native-", dir=os.environ.get("TMPDIR")) as tmp:
+        with tempfile.TemporaryDirectory(prefix="outcome-native-", dir=os.environ.get("TMPDIR")) as tmp:
             base = Path(tmp).resolve()
             with patch.dict(os.environ, {"HERMES_KANBAN_DB": "/outside/board.db",
                                          "HERMES_KANBAN_TASK": "outside", "OPENAI_API_KEY": "synthetic"}):
-                env = install_fixture(base, "phase0-a")
+                env = install_fixture(base, "outcome-test-a")
                 self.assertFalse({"HERMES_KANBAN_DB", "HERMES_KANBAN_TASK", "OPENAI_API_KEY"} & env.keys())
                 with patch.dict(os.environ, env, clear=True):
                     validate_paths(base)

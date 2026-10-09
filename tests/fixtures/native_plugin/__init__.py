@@ -11,7 +11,7 @@ import time
 
 
 def register(ctx):
-    from .hermes_outcome_loop import register as production_register
+    from ._production_entry import register as production_register
 
     original = ctx.dispatch_tool
     fault = {"mode": None, "calls": []}
