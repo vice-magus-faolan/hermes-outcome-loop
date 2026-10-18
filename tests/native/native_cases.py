@@ -92,8 +92,8 @@ def race_cases(api):
         profiles = parallel_observations(api, task, [first, second], index)
         view = api.outcome("outcome_show", task)["view"]
         require(preserved(baseline, snapshot(api.base, task), 2), "race changed native completion or runs")
-        occurrences = view["occurrences"][first["record_id"]]
         if mode == "identical":
+            occurrences = view["observations"][-1]["provenance"]["samples"]
             require(view["state"] == "confirmed" and len(occurrences) == 2, "identical race lost logical retry/provenance")
             require({row["author"] for row in occurrences} == set(profiles), "race lost native authors")
         else:

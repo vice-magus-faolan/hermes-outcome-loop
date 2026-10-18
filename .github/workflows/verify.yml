@@ -3,6 +3,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    - cron: '17 6 * * 1'
 permissions:
   contents: read
 jobs:
@@ -10,12 +12,16 @@ jobs:
     name: repository-verify
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        hermes-ref: ${{ github.event_name == 'schedule' && fromJSON('["v0.22.2", "main"]') || fromJSON('["v0.22.2"]') }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
       - name: Build pinned test dependencies
-        run: timeout --signal=TERM --kill-after=30s 1200s docker build -t outcome-loop-test -f docker/Dockerfile .
+        run: timeout --signal=TERM --kill-after=30s 1200s docker build --build-arg HERMES_REF=${{ matrix.hermes-ref }} -t outcome-loop-test -f docker/Dockerfile .
       - name: Run product tests in an isolated container
         run: |
           container="outcome-loop-ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"

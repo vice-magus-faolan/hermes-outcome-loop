@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Run production unit, distribution and required real-Hermes tests in Docker."""
+"""Run production unit, distribution and required real-Hermes tests."""
 import ast
 import json
 from pathlib import Path
@@ -11,10 +11,10 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 
-def test_ids(suite):
+def discovered_ids(suite):
     """Flatten discovery; failed imports are not proof of coverage."""
     if isinstance(suite, unittest.TestSuite):
-        return {identifier for child in suite for identifier in test_ids(child)}
+        return {identifier for child in suite for identifier in discovered_ids(child)}
     return {suite.id()}
 
 
@@ -38,14 +38,11 @@ def require_production_gates(identifiers: set[str]) -> None:
 
 
 def main() -> int:
-    if not Path("/.dockerenv").is_file():
-        print("Run this verifier in Docker; see README.md", file=sys.stderr)
-        return 1
     for directory in ("scripts", "tests", "hermes_outcome_loop"):
         for path in (ROOT / directory).rglob("*.py"):
             ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     suite = unittest.defaultTestLoader.discover(str(ROOT / "tests"))
-    require_production_gates(test_ids(suite))
+    require_production_gates(discovered_ids(suite))
     print(f"Repository verification: {suite.countTestCases()} discovered tests", flush=True)
     result = unittest.TextTestRunner(verbosity=2).run(suite)
     return 0 if result.wasSuccessful() else 1

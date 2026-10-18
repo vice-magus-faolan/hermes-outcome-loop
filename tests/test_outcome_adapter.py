@@ -76,7 +76,7 @@ class AdapterTests(unittest.TestCase):
         body = native.calls[1][1]["body"]
         self.assertEqual(records.decode(body), load("golden.json")["contract"])
         self.assertEqual(set(native.calls[1][1]), {"board", "task_id", "body"})
-        self.assertEqual(reply["view"]["occurrences"][load("golden.json")["contract"]["record_id"]][0]["author"], "native-profile")
+        self.assertEqual(reply["view"]["contract"]["provenance"]["samples"][0]["author"], "native-profile")
         native.calls.clear()
         reply = tools.invoke("outcome_define", request("contract"))
         self.assertEqual(reply["acknowledgment"], "identical_retry")
@@ -264,7 +264,7 @@ class AdapterTests(unittest.TestCase):
         native.after = lambda n: n.state["comments"].append(copy.deepcopy(n.state["comments"][-1]))
         reply = adapter(native).invoke("outcome_observe", request("confirmed"))
         self.assertTrue(reply["ok"])
-        self.assertEqual(len(reply["view"]["occurrences"][golden["confirmed"]["record_id"]]), 2)
+        self.assertEqual(reply["view"]["observations"][-1]["provenance"]["occurrence_count"], 2)
 
     def test_history_bounds_include_proposed_append(self):
         row = {"body": "ordinary", "author": "native-profile", "created_at": 1}

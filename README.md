@@ -37,7 +37,7 @@ plugin does not remove native comments or delivery history.
 
 ## Development
 
-Tests use Docker, not another Hermes installation on the host. The pinned image
+Docker is the default isolated test path, not another host installation. The pinned image
 contains test dependencies; the container loads this checkout read-only. Build
 online, then run the production unit, distribution and real-Hermes tests offline:
 
@@ -49,6 +49,20 @@ timeout --signal=TERM --kill-after=10s 300s docker run --rm --init --pull=never 
   --tmpfs /scratch:rw,exec,nosuid,nodev,size=1g,mode=1777 \
   --mount type=bind,src="$PWD",dst=/source,readonly outcome-loop-test
 ```
+
+The image fetches unmodified `NousResearch/hermes-agent` at supported release
+`v0.22.2`; override with `--build-arg HERMES_REF=main` to investigate upstream drift.
+Build and native-test logs report the actual checked-out revision. CI tests the
+supported release on PRs and pushes, and both that release and upstream main weekly.
+Hermes is installed editably inside the image, as its development packaging permits;
+no core build guards are disabled.
+
+With an existing supported Hermes development environment and the dependencies in
+`requirements-test.txt`, ordinary `python3 -m pytest` or `python3 scripts/verify.py` also
+work outside Docker. Set `HERMES_TEST_SOURCE` to that unmodified upstream checkout
+and `TMPDIR` to an owned writable scratch directory. Native cases remain required:
+they create and remove disposable homes/profiles/boards, discard ambient credentials
+and report missing prerequisites as errors rather than skips. No live profile is used.
 
 Build a portable directory and deterministic archive with
 `python3 scripts/package_plugin.py --output dist` (stdlib only; choose a new output

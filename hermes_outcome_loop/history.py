@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 import copy
+import json
 
 from .records import (MAX_COMMENTS, MAX_HISTORY_BYTES, OutcomeError, decode,
                       timestamp, utf8_length)
@@ -223,3 +224,109 @@ def reconstruct(rows: object, status: str, board: str, task_id: str,
     diagnostics.update(contextual(contracts, observations, chain, status, completed_at))
     state = derived_state(diagnostics, contracts, chain, observations, status)
     return present(state, diagnostics, variants, sources, chain, board, task_id, status)
+
+
+MAX_RESPONSE_BYTES = 32768
+
+
+def response_bytes(value: dict) -> int:
+    """Measure the actual public handler's UTF-8 JSON encoding, including envelope."""
+    return len(json.dumps(value, ensure_ascii=False, allow_nan=False).encode("utf-8"))
+
+
+def provenance(rows: list[dict]) -> dict:
+    """Retain small attribution samples without copying native bodies or huge metadata."""
+    samples = []
+    for row in rows[:4]:
+        sample = {key: row[key] for key in ("author", "created_at")}
+        if response_bytes(sample) <= 512:
+            samples.append(sample)
+    return {"occurrence_count": len(rows), "samples": samples,
+            "omitted_occurrences": len(rows) - len(samples)}
+
+
+def public_record(record: dict, sources: dict, compact: bool = False) -> dict:
+    """A payload appears once; compact fallback retains causal identity and digest."""
+    keys = ("record_id", "payload_sha256", "type", "contract_id", "predecessor",
+            "result", "observed_at", "regression_of", "requires_artifact")
+    value = {key: record[key] for key in keys if key in record} if compact else copy.deepcopy(record)
+    value["provenance"] = provenance(sources.get(record["record_id"], []))
+    value["omitted_fields"] = sorted(set(record) - set(value))
+    return value
+
+
+def offer(result: dict, container: dict, key: str, value: object) -> bool:
+    """Admit a whole structured field only when the complete reply still fits."""
+    previous = container[key]
+    container[key] = value
+    if response_bytes(result) <= MAX_RESPONSE_BYTES:
+        return True
+    container[key] = previous
+    return False
+
+
+def base_public_view(internal: dict, conflict_count: int) -> dict:
+    """Reserve bounded current identity and honest totals before offering detail."""
+    keys = ("board", "task_id", "kanban_status", "delivery_done", "state", "action",
+            "diagnostics", "suggestion", "latest", "timing", "due_status", "due_at",
+            "anchor_sources", "timing_message", "timing_diagnostics")
+    view = {key: copy.deepcopy(internal[key]) for key in keys}
+    contract, head = internal["contract"], internal["head"]
+    sources = internal["occurrences"]
+    observation_count = sum(key.startswith("oo_") for key in internal["variants"])
+    # Schema-bounded identity/timing and capped provenance fit before optional detail.
+    # Reserve maximum omission counts now; final counts can only shrink the encoding.
+    view.update(contract=public_record(contract, sources, True) if contract else None,
+                observations=[public_record(head, sources, True)] if head else [],
+                chain=[], conflicts=[], ambiguous_record_ids=[], record_count=len(internal["variants"]),
+                occurrence_count=sum(len(rows) for rows in sources.values()),
+                observation_count=observation_count, conflict_count=conflict_count,
+                omitted={"observations": observation_count - bool(head),
+                         "chain": len(internal["chain"]), "conflicts": conflict_count,
+                         "ambiguous_record_ids": len(internal["variants"]) if internal["diagnostics"] else 0},
+                response_budget_bytes=MAX_RESPONSE_BYTES)
+    return view
+
+
+def public_result(result: dict) -> dict:
+    """Project only after full reconstruction/write readback; never select ambiguity.
+
+    Prioritize current identity, contract and head detail, then recent observations,
+    causal IDs and conflict summaries. Offer whole values against the encoded budget.
+    """
+    if "view" not in result:
+        return result
+    internal = result["view"]
+    contract, head = internal["contract"], internal["head"]
+    sources = internal["occurrences"]
+    conflicts = {key: values for key, values in internal["variants"].items() if len(values) > 1}
+    view = base_public_view(internal, len(conflicts))
+    result = {**result, "view": view}
+    if internal["diagnostics"]:
+        offer(result, view, "ambiguous_record_ids", sorted(internal["variants"])[:32])
+    if contract:
+        offer(result, view, "contract", public_record(contract, sources))
+    if head:
+        offer(result, view, "observations", [public_record(head, sources)])
+    for record in reversed(internal["observations"][:-1]):
+        if len(view["observations"]) >= 8:
+            break
+        for compact in (False, True):
+            candidate = [public_record(record, sources, compact), *view["observations"]]
+            if offer(result, view, "observations", candidate):
+                break
+    offer(result, view, "chain", internal["chain"][-32:])
+    for identifier, variants in sorted(conflicts.items()):
+        if len(view["conflicts"]) >= 8:
+            break
+        summary = {"record_id": identifier, "variant_count": len(variants),
+                   "payload_sha256s": sorted(value["payload_sha256"] for value in variants)[:8],
+                   "omitted_payload_sha256s": max(0, len(variants) - 8),
+                   "provenance": provenance(sources[identifier])}
+        offer(result, view, "conflicts", [*view["conflicts"], summary])
+    view["omitted"] = {"observations": view["observation_count"] - len(view["observations"]),
+                       "chain": len(internal["chain"]) - len(view["chain"]),
+                       "conflicts": len(conflicts) - len(view["conflicts"]),
+                       "ambiguous_record_ids": (len(internal["variants"]) - len(view["ambiguous_record_ids"]))
+                       if internal["diagnostics"] else 0}
+    return result
