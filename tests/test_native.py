@@ -36,7 +36,8 @@ class ProductionNativeTests(unittest.TestCase):
 
     def test_results_retry_unfinished_and_full_native_history(self):
         for name in ("define_view_results_regression", "unfinished_rejected",
-                     "native_review_completion_preserved", "stable_retry_no_write"):
+                     "native_review_completion_preserved", "stable_retry_no_write",
+                     "native_recompletion_recovery_preserves_history"):
             self.assertTrue(self.report[name], name)
 
     def test_restart_profiles_and_actual_parallel_races(self):

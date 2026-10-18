@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 import copy
+from datetime import timezone
 import json
 
 from .records import (MAX_COMMENTS, MAX_HISTORY_BYTES, OutcomeError, decode,
@@ -43,7 +44,33 @@ def valid_provenance(author: object, created: object) -> bool:
             and type(created) is int and created >= 0)
 
 
-def collect(rows: list[dict], board: str, task_id: str) -> tuple[dict, dict, set[str]]:
+def observation_timing(value: dict, created_at: int, completed_at: str | None,
+                       past_completions: tuple[int, ...] | None) -> set[str]:
+    """An older delivery needs native run evidence tied to EACH persisted occurrence.
+
+    A newly persisted backdate cannot borrow an old run. This is a delivery floor,
+    not authentication of the commenter or a reconstruction of past done intervals.
+    """
+    if value["type"] != "observation" or completed_at is None:
+        return set()
+    observed = timestamp(value["observed_at"])
+    completed = timestamp(completed_at)
+    if observed >= completed:
+        return set()
+    current_epoch = int(completed.replace(tzinfo=timezone.utc).timestamp())
+    if created_at >= current_epoch:
+        return {"invalid_evidence"}
+    if past_completions is None:
+        return {"completion_history_unavailable"}
+    candidates = [anchor for anchor in past_completions if anchor <= created_at and anchor < current_epoch]
+    if not candidates:
+        return {"completion_history_unavailable"}
+    observed_epoch = int(observed.replace(tzinfo=timezone.utc).timestamp())
+    return {"invalid_evidence"} if observed_epoch < max(candidates) else set()
+
+
+def collect(rows: list[dict], board: str, task_id: str, completed_at: str | None,
+            past_completions: tuple[int, ...] | None) -> tuple[dict, dict, set[str]]:
     variants, occurrences, diagnostics = defaultdict(list), defaultdict(list), set()
     for row in rows:
         if not row["body"].startswith("[hermes-outcome:"):
@@ -62,6 +89,7 @@ def collect(rows: list[dict], board: str, task_id: str) -> tuple[dict, dict, set
             diagnostics.add("conflicting_payload")
         if (value["board"], value["task_id"]) != (board, task_id):
             diagnostics.add("target_mismatch")
+        diagnostics.update(observation_timing(value, row["created_at"], completed_at, past_completions))
     return dict(variants), dict(occurrences), diagnostics
 
 
@@ -158,15 +186,10 @@ def regression_diagnostics(observations: dict, chain: list[str]) -> set[str]:
     return diagnostics
 
 
-def contextual(contracts: dict, observations: dict, chain: list[str], status: str,
-               completed_at: str | None) -> set[str]:
+def contextual(contracts: dict, observations: dict, chain: list[str], status: str) -> set[str]:
     diagnostics = set()
     if observations and status != "done":
         diagnostics.add("observations_on_unfinished")
-    for variants in observations.values():
-        for value in variants:
-            if completed_at is not None and timestamp(value["observed_at"]) < timestamp(completed_at):
-                diagnostics.add("invalid_evidence")
     if len(contracts) != 1:
         return diagnostics | ({"orphan_observation"} if observations else set())
     contract_id, contracts = next(iter(contracts.items()))
@@ -216,12 +239,13 @@ def present(state: str, diagnostics: set[str], variants: dict, sources: dict,
 
 
 def reconstruct(rows: object, status: str, board: str, task_id: str,
-                completed_at: str | None = None) -> dict:
+                completed_at: str | None = None,
+                past_completions: tuple[int, ...] | None = None) -> dict:
     """Return all diagnostics and source occurrences; invalidity suppresses success."""
     admitted, diagnostics = native_rows(rows)
     if "history_limit" in diagnostics:
         return present("invalid_history", diagnostics, {}, {}, [], board, task_id, status, set())
-    variants, sources, errors = collect(admitted, board, task_id)
+    variants, sources, errors = collect(admitted, board, task_id, completed_at, past_completions)
     diagnostics.update(errors)
     contracts = {key: values for key, values in variants.items() if key.startswith("oc_")}
     observations = {key: values for key, values in variants.items() if key.startswith("oo_")}
@@ -232,7 +256,7 @@ def reconstruct(rows: object, status: str, board: str, task_id: str,
     chain, graph_errors, fork_ids = topology(observations)
     ambiguous_ids.update(fork_ids)
     diagnostics.update(graph_errors)
-    diagnostics.update(contextual(contracts, observations, chain, status, completed_at))
+    diagnostics.update(contextual(contracts, observations, chain, status))
     state = derived_state(diagnostics, contracts, chain, observations, status)
     return present(state, diagnostics, variants, sources, chain, board, task_id, status, ambiguous_ids)
 

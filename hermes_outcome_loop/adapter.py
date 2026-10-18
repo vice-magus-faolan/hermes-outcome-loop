@@ -105,6 +105,39 @@ def native_task(reply: dict, task_id: str) -> tuple[str, str | None]:
     return status, completion_time(task)
 
 
+def historical_completions(reply: dict) -> tuple[int, ...] | None:
+    """Public v0.22.2 runs are complete; recent events are not a lifecycle ledger.
+
+    Both claimed ('done') and synthesized ('completed') completion runs exist.
+    Missing/ambiguous completion metadata cannot justify an earlier delivery.
+    """
+    runs = reply.get("runs")
+    if not isinstance(runs, list):
+        return None
+    anchors, identifiers = [], set()
+    for run in runs:
+        if not isinstance(run, dict) or not {"id", "status", "outcome", "started_at", "ended_at"} <= run.keys():
+            return None
+        identifier = run.get("id")
+        if type(identifier) is not int or identifier <= 0 or identifier in identifiers:
+            return None
+        identifiers.add(identifier)
+        if not isinstance(run["status"], str) or not isinstance(run["outcome"], (str, type(None))):
+            return None
+        if run.get("outcome") != "completed":
+            continue
+        start, end = run.get("started_at"), run.get("ended_at")
+        if (run.get("status") not in {"done", "completed"} or type(start) is not int
+                or type(end) is not int or not 0 <= start <= end):
+            return None
+        anchors.append(end)
+    return tuple(anchors)
+
+
+def lifecycle_identity(task: dict) -> tuple:
+    return tuple(task.get(key) for key in ("status", "completed_at", "current_run_id"))
+
+
 def delayed_due(anchor: str, delay_seconds: int) -> datetime | None:
     """Return an exact UTC bound, or None when it is beyond the calendar range.
 
@@ -159,18 +192,18 @@ def preflight(record: dict, reply: dict, view: dict, completed: str | None) -> s
         raise OutcomeError("unfinished_task")
     if view["diagnostics"]:
         raise OutcomeError("invalid_history")
-    if record["type"] == "observation" and completed is not None:
-        if records.timestamp(record["observed_at"]) < records.timestamp(completed):
-            raise OutcomeError("pre_delivery_observation")
     existing = view["variants"].get(record["record_id"])
     if existing:
         if existing != [record]:
             raise OutcomeError("conflict")
         return "identical_retry"
+    if record["type"] == "observation" and completed is not None:
+        if records.timestamp(record["observed_at"]) < records.timestamp(completed):
+            raise OutcomeError("pre_delivery_observation")
     check_identity(record, view)
     synthetic = {"body": records.encode(record), "author": "preflight-only", "created_at": 0}
     proposed = history.reconstruct(reply["comments"] + [synthetic], view["kanban_status"],
-                                   record["board"], record["task_id"], completed)
+                                   record["board"], record["task_id"], completed, historical_completions(reply))
     if "history_limit" in proposed["diagnostics"]:
         raise OutcomeError("history_limit")
     if proposed["diagnostics"]:
@@ -229,20 +262,23 @@ class OutcomeAdapter:
     def read(self, board: str, task_id: str, anchors: dict) -> tuple[dict, dict, str | None]:
         reply = self.native("kanban_show", {"board": board, "task_id": task_id})
         status, completed = native_task(reply, task_id)
-        view = history.reconstruct(reply.get("comments"), status, board, task_id, completed)
+        view = history.reconstruct(reply.get("comments"), status, board, task_id, completed,
+                                   historical_completions(reply))
         timing_view(view, completed, anchors, self.clock())
         return reply, view, completed
 
-    def append(self, record: dict, anchors: dict) -> dict:
+    def append(self, record: dict, anchors: dict, before_task: dict) -> dict:
         """At most one attempted append, and exact persisted-body/full-history admission."""
         board, task_id = record["board"], record["task_id"]
         expected = records.encode(record)
         try:
             self.native("kanban_comment", {"board": board, "task_id": task_id, "body": expected})
-            _, view, _ = self.read(board, task_id, anchors)
+            reply, view, _ = self.read(board, task_id, anchors)
             sources = view["occurrences"].get(record["record_id"], [])
             if view["diagnostics"]:
                 return failure("write_unverified", True, view["diagnostics"])
+            if lifecycle_identity(reply["task"]) != lifecycle_identity(before_task):
+                return failure("write_unverified", True, ["lifecycle_changed"])
             if not any(row["body"] == expected for row in sources):
                 return failure("write_unverified", True, ["readback_mismatch"])
             if view["variants"].get(record["record_id"]) != [record]:
@@ -269,7 +305,7 @@ class OutcomeAdapter:
             if admission == "identical_retry":
                 return {"ok": True, "acknowledgment": admission, "record_id": record["record_id"],
                         "may_have_persisted": False, "view": view}
-            return self.append(record, anchors)
+            return self.append(record, anchors, reply["task"])
         except OutcomeError as error:
             return failure(str(error))
         except Exception:

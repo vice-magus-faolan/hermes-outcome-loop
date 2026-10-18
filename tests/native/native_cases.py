@@ -14,6 +14,59 @@ def ordinary_delivery(api, task):
     api.complete(task)
 
 
+def recompletion_case(api):
+    """Preserve admitted v1 bytes through an actual native reopen and new delivery."""
+    from plugins.kanban.dashboard.plugin_api import UpdateTaskBody, update_task
+
+    task = api.create()
+    require(api.outcome("outcome_define", task, api.payload("contract", task))["ok"], "definition failed")
+    api.complete(task)
+    confirmed = api.payload("confirmed", task)
+    require(api.outcome("outcome_observe", task, confirmed)["ok"], "confirmation failed")
+    correction = api.payload("regressed", task)
+    require(api.outcome("outcome_observe", task, correction)["ok"], "correction failed")
+    original = api.native("kanban_show", task_id=task, board="outcome-test")
+    require(update_task(task, UpdateTaskBody(status="ready"), board="outcome-test")["task"]["status"] == "ready",
+            "native reopen failed")
+    require(api.outcome("outcome_observe", task, confirmed)["error"] == "unfinished_task",
+            "reopened retry admitted")
+    # Native timestamps have one-second resolution; establish a genuinely later anchor.
+    while int(time.time()) <= max(original["task"]["completed_at"], original["comments"][-1]["created_at"]):
+        time.sleep(0.01)
+    api.complete(task)
+    delivered = api.native("kanban_show", task_id=task, board="outcome-test")
+    require(delivered["task"]["completed_at"] > original["task"]["completed_at"], "completion anchor did not advance")
+    require(delivered["comments"] == original["comments"], "recompletion rewrote outcome history")
+    view = api.outcome("outcome_show", task)["view"]
+    require(view["state"] == "regressed" and len(view["observations"]) == 2,
+            "recompletion poisoned previously admitted observations")
+    for value in (confirmed, correction):
+        require(api.outcome("outcome_observe", task, value).get("acknowledgment") == "identical_retry",
+                "historical exact retry was not read-only")
+    recovery = api.payload("confirmed", task)
+    recovery.update(record_id="oo_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", predecessor=correction["record_id"])
+    backdated = dict(recovery, observed_at=confirmed["observed_at"])
+    require(api.outcome("outcome_observe", task, backdated).get("error") == "pre_delivery_observation",
+            "new backdated recovery admitted")
+    conflict = dict(confirmed, summary="Conflicting historical payload")
+    require(api.outcome("outcome_observe", task, conflict).get("error") == "conflict", "historical conflict admitted")
+    require(api.outcome("outcome_observe", task, dict(recovery, predecessor=None)).get("error") == "stale_predecessor",
+            "stale recovery admitted")
+    baseline = snapshot(api.base, task)
+    require(api.native("kanban_show", task_id=task, board="outcome-test")["comments"] == original["comments"],
+            "retry or rejection appended")
+    result = api.outcome("outcome_observe", task, recovery)
+    require(result["ok"] and result["view"]["state"] == "confirmed", "post-new-delivery recovery failed")
+    require(len(result["view"]["observations"]) == 3, "recovery replaced history")
+    require(preserved(baseline, snapshot(api.base, task), 1), "recovery changed native lifecycle")
+    after = api.native("kanban_show", task_id=task, board="outcome-test")["comments"]
+    require(after[:-1] == original["comments"], "original bytes or provenance changed")
+    reread = api.reopen(task, "show", "outcome-test-recompletion-reader")
+    require(reread["view"] == result["view"] and reread["comments"] == after,
+            "fresh registered reader lost recompletion history")
+    return {"native_recompletion_recovery_preserves_history": True}
+
+
 def failure_cases(api):
     disabled = api.create()
     require(api.reopen(disabled, "disabled", "outcome-test-disabled", enabled=False)["completed"], "disabled path failed")
