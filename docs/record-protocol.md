@@ -84,29 +84,15 @@ are optional attribution only and cannot supply ordering. Do not fabricate IDs.
 `artifact` identifies the actually observed delivered artifact and is required when
 contract `requires_artifact` is true, otherwise may be null. This is a caller evidence
 claim, not proof of deployment. Observe requires native `done` on a fresh read;
-all other statuses reject without append, including retries. If a known native
-completion timestamp proves a NEW observation predates the current delivery, reject
-without append. An exact existing payload retry is read-only, even after a later
-native re-completion, provided the full persisted history remains valid.
+all other statuses reject without append, including retries.
 
-For a persisted observation predating the current completion, examine each native
-occurrence separately. Occurrences persisted at/after the current completion cannot
-borrow an earlier delivery. Older occurrences require a native historical run with
-`outcome: completed`, status `done` or `completed`, and valid start/end timestamps.
-Use the latest such completion at/before that occurrence's native creation time;
-`observed_at` must not precede it. Missing, partial, malformed or ambiguous run
-metadata that cannot establish this floor yields `completion_history_unavailable`,
-invalid history, not grandfathered success. Native v0.22.2 exposes complete runs;
-its bounded recent events, caller prose and comment order cannot replace them.
-This validates a historical delivery floor, not the original writer's admission
-or a complete historical interval of `done` status. Native comments and checksums
-do not authenticate plugin authorship. Existing bodies/provenance are never rewritten.
-
-A concurrent native lifecycle change cannot be atomically fenced with public comments;
-post-write fresh reads compare status, completion timestamp and current run identity
-with preflight. A change yields `write_unverified` (diagnostic `lifecycle_changed`
-when history otherwise validates), even when historical evidence remains readable.
-A change after that read remains outside this snapshot's guarantee.
+- Exact existing payload retries are read-only when the persisted history is valid.
+- New observations require `observed_at >= completed_at` when completion is known.
+- Older stored observations require each comment's creation before the current
+  completion and `observed_at` at/after the latest completed run ending at/before
+  that comment. Unavailable or malformed evidence yields `completion_history_unavailable`.
+- Post-write changes to status, completion timestamp or latest completed-run ID
+  yield `write_unverified`, with `lifecycle_changed` when history otherwise validates.
 
 Provide exactly one evidence row per criterion, no duplicate/unknown/missing IDs.
 Rows with unobserved criteria use `finding: unknown` and explain the gap. `kind` is

@@ -105,8 +105,8 @@ def native_task(reply: dict, task_id: str) -> tuple[str, str | None]:
     return status, completion_time(task)
 
 
-def historical_completions(reply: dict) -> tuple[int, ...] | None:
-    """Public v0.22.2 runs are complete; recent events are not a lifecycle ledger.
+def completed_runs(reply: dict) -> tuple[tuple[int, int], ...] | None:
+    """Validate native runs and retain each completed run's (end time, ID).
 
     Both claimed ('done') and synthesized ('completed') completion runs exist.
     Missing/ambiguous completion metadata cannot justify an earlier delivery.
@@ -130,12 +130,23 @@ def historical_completions(reply: dict) -> tuple[int, ...] | None:
         if (run.get("status") not in {"done", "completed"} or type(start) is not int
                 or type(end) is not int or not 0 <= start <= end):
             return None
-        anchors.append(end)
+        anchors.append((end, identifier))
     return tuple(anchors)
 
 
-def lifecycle_identity(task: dict) -> tuple:
-    return tuple(task.get(key) for key in ("status", "completed_at", "current_run_id"))
+def historical_completions(reply: dict) -> tuple[int, ...] | None:
+    """kanban_show returns every run but only the last 50 events; use run completion times."""
+    runs = completed_runs(reply)
+    return None if runs is None else tuple(end for end, _ in runs)
+
+
+def lifecycle_identity(reply: dict) -> tuple:
+    runs = completed_runs(reply)
+    task = reply["task"]
+    if runs is None or (task.get("completed_at") is not None and task.get("status") == "done" and not runs):
+        raise OutcomeError("completion_history_unavailable")
+    latest = max(runs)[1] if runs else None
+    return task.get("status"), task.get("completed_at"), latest
 
 
 def delayed_due(anchor: str, delay_seconds: int) -> datetime | None:
@@ -267,7 +278,7 @@ class OutcomeAdapter:
         timing_view(view, completed, anchors, self.clock())
         return reply, view, completed
 
-    def append(self, record: dict, anchors: dict, before_task: dict) -> dict:
+    def append(self, record: dict, anchors: dict, before_identity: tuple) -> dict:
         """At most one attempted append, and exact persisted-body/full-history admission."""
         board, task_id = record["board"], record["task_id"]
         expected = records.encode(record)
@@ -277,7 +288,7 @@ class OutcomeAdapter:
             sources = view["occurrences"].get(record["record_id"], [])
             if view["diagnostics"]:
                 return failure("write_unverified", True, view["diagnostics"])
-            if lifecycle_identity(reply["task"]) != lifecycle_identity(before_task):
+            if lifecycle_identity(reply) != before_identity:
                 return failure("write_unverified", True, ["lifecycle_changed"])
             if not any(row["body"] == expected for row in sources):
                 return failure("write_unverified", True, ["readback_mismatch"])
@@ -305,7 +316,7 @@ class OutcomeAdapter:
             if admission == "identical_retry":
                 return {"ok": True, "acknowledgment": admission, "record_id": record["record_id"],
                         "may_have_persisted": False, "view": view}
-            return self.append(record, anchors, reply["task"])
+            return self.append(record, anchors, lifecycle_identity(reply))
         except OutcomeError as error:
             return failure(str(error))
         except Exception:

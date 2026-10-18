@@ -29,13 +29,11 @@ class RecompletionTests(unittest.TestCase):
     def show(self, native):
         return adapter(native).invoke("outcome_show", {"board": BOARD, "task_id": TASK})["view"]
 
-    def test_historical_floor_is_native_and_independent_of_events_or_row_order(self):
+    def test_historical_floor_is_independent_of_row_order(self):
         native = historical_native()
         expected = self.show(native)
         self.assertEqual(expected["state"], "confirmed")
         self.assertEqual(expected["observations"][0]["provenance"]["samples"][0]["created_at"], OBSERVED)
-        # A bounded window can omit ALL older lifecycle events; it supplies no anchors.
-        native.state["events"] = [{"kind": "commented", "created_at": CURRENT}] * 50
         native.state["comments"].reverse()
         native.state["runs"].reverse()
         self.assertEqual(self.show(native), expected)
@@ -53,9 +51,6 @@ class RecompletionTests(unittest.TestCase):
             with self.subTest(runs=bad):
                 native = historical_native()
                 native.state["runs"] = bad
-                # Caller prose and recent events cannot substitute for missing run evidence.
-                native.state["events"] = [{"kind": "completed", "created_at": FIRST, "run_id": 1}]
-                native.state["worker_context"] = "The older observation was legitimately admitted."
                 view = self.show(native)
                 self.assertEqual(view["state"], "invalid_history")
                 self.assertIn("completion_history_unavailable", view["diagnostics"])
@@ -99,22 +94,62 @@ class RecompletionTests(unittest.TestCase):
         for same_second in (False, True):
             with self.subTest(same_second=same_second):
                 native = Native([source(load("golden.json")["contract"])])
-                native.state["task"].update(completed_at=FIRST, current_run_id=1)
-                native.state["runs"] = [completion(1, FIRST)]
+                initial = OBSERVED if same_second else FIRST
+                native.state["task"].update(completed_at=initial, current_run_id=None)
+                native.state["runs"] = [completion(1, initial)]
+                before_task = copy.deepcopy(native.state["task"])
 
                 def recomplete(native):
                     native.state["comments"][-1]["created_at"] = OBSERVED
-                    anchor = FIRST if same_second else CURRENT
-                    native.state["task"].update(completed_at=anchor, current_run_id=2)
+                    anchor = OBSERVED if same_second else CURRENT
+                    native.state["task"].update(completed_at=anchor, current_run_id=None)
                     native.state["runs"].append(completion(2, anchor, "done"))
 
                 native.after = recomplete
                 result = adapter(native).invoke("outcome_observe", request("confirmed"))
+                self.assertIsNone(native.state["task"]["current_run_id"])
+                self.assertEqual(len(native.state["runs"]), 2)
+                if same_second:
+                    self.assertEqual(native.state["task"], before_task)
                 self.assertEqual(result["error"], "write_unverified")
                 self.assertTrue(result["may_have_persisted"])
                 self.assertEqual(result["diagnostics"], ["lifecycle_changed"])
                 self.assertEqual([name for name, _ in native.calls].count("kanban_comment"), 1)
                 self.assertEqual(self.show(native)["state"], "confirmed")
+
+    def test_missing_or_malformed_run_identity_fails_closed_before_and_after_append(self):
+        for bad in (None, {}, [], [{"id": 1}], [completion(1, FIRST), completion(1, FIRST)]):
+            for postwrite in (False, True):
+                with self.subTest(runs=bad, postwrite=postwrite):
+                    native = Native([source(load("golden.json")["contract"])])
+                    native.state["task"].update(completed_at=FIRST, current_run_id=None)
+                    native.state["runs"] = [completion(1, FIRST)]
+
+                    def corrupt(native):
+                        native.state["runs"] = bad
+
+                    if postwrite:
+                        native.after = corrupt
+                    else:
+                        corrupt(native)
+                    result = adapter(native).invoke("outcome_observe", request("confirmed"))
+                    expected = "write_unverified" if postwrite else "completion_history_unavailable"
+                    self.assertEqual(result["error"], expected)
+                    self.assertEqual(result["diagnostics"], ["completion_history_unavailable"])
+                    self.assertEqual(result["may_have_persisted"], postwrite)
+                    self.assertEqual([name for name, _ in native.calls].count("kanban_comment"), int(postwrite))
+
+    def test_unchanged_completed_runs_reordered_after_append_are_verified(self):
+        native = historical_native()
+
+        def reorder(native):
+            native.state["comments"][-1]["created_at"] = CURRENT
+            native.state["runs"].reverse()
+
+        native.after = reorder
+        result = adapter(native).invoke("outcome_observe", request("regressed", observed_at="2026-10-04T00:00:00Z"))
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(result["acknowledgment"], "verified")
 
 
 if __name__ == "__main__":

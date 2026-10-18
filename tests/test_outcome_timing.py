@@ -38,6 +38,8 @@ class TimingTests(unittest.TestCase):
     def test_overflowing_done_bound_define_readback_retry_and_fresh_reads(self):
         native = Native()
         native.state["task"]["completed_at"] = MAX_COMPLETION
+        native.state["runs"] = [{"id": 1, "status": "completed", "outcome": "completed",
+                                 "started_at": MAX_COMPLETION, "ended_at": MAX_COMPLETION}]
         params = request("contract")
         params["contract"]["timing"].update(anchor="done", delay_seconds=86400, deadline=None)
         defined = adapter(native).invoke("outcome_define", params)
@@ -69,6 +71,8 @@ class TimingTests(unittest.TestCase):
         contract["timing"].update(anchor="done", delay_seconds=MAX_DELAY)
         native = Native([source(contract)])
         native.state["task"]["completed_at"] = MAX_COMPLETION
+        native.state["runs"] = [{"id": 1, "status": "completed", "outcome": "completed",
+                                 "started_at": MAX_COMPLETION, "ended_at": MAX_COMPLETION}]
         observed = adapter(native).invoke("outcome_observe", request("confirmed", observed_at=MAX_UTC))
         self.assertTrue(observed["ok"], observed)
         self.assertEqual(observed["acknowledgment"], "verified")
