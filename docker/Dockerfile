@@ -10,11 +10,11 @@ RUN apt-get -o Acquire::Check-Valid-Until=false update && \
 RUN git init /opt/hermes && \
     git -C /opt/hermes fetch --depth 1 https://github.com/NousResearch/hermes-agent.git "$HERMES_REF" && \
     git -C /opt/hermes checkout --detach FETCH_HEAD && \
-    git -C /opt/hermes rev-parse HEAD && \
     git config --system --add safe.directory /opt/hermes
 COPY requirements.txt requirements-test.txt /opt/
-RUN python -m venv /opt/runtime && \
-    /opt/runtime/bin/python -m pip install --no-cache-dir -e /opt/hermes -r /opt/requirements-test.txt
+RUN PYTHONPATH=/opt/hermes python -m pm.build_env --source /opt/hermes --export-requirements /opt/core-requirements.txt && \
+    python -m venv /opt/runtime && \
+    /opt/runtime/bin/python -m pip install --no-cache-dir -r /opt/core-requirements.txt -r /opt/requirements-test.txt
 ENV HOME=/scratch/home TMPDIR=/scratch PYTHONDONTWRITEBYTECODE=1
 ENV HERMES_TEST_SOURCE=/opt/hermes
 USER 65532:65532

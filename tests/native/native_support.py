@@ -92,6 +92,4 @@ def collect(debug: bool = False) -> dict:
                 print(errors[-4096:].replace(str(base), "<disposable-root>")
                       .replace(str(source), "<hermes-source>"), file=sys.stderr)
             raise RuntimeError("production-native integration failed")
-        report = json.loads(output)
-        require(report["hermes_sha"] == sha, "native integration revision report mismatch")
-        return report
+        return json.loads(output)

@@ -65,7 +65,7 @@ def collect(rows: list[dict], board: str, task_id: str) -> tuple[dict, dict, set
     return dict(variants), dict(occurrences), diagnostics
 
 
-def topology(observations: dict) -> tuple[list[str], set[str]]:
+def topology(observations: dict) -> tuple[list[str], set[str], set[str]]:
     """Use all-variant union edges for errors; never choose a conflicting payload."""
     children, diagnostics = defaultdict(set), set()
     for identifier, variants in observations.items():
@@ -74,19 +74,25 @@ def topology(observations: dict) -> tuple[list[str], set[str]]:
             children[parent].add(identifier)
             if parent is not None and parent not in observations:
                 diagnostics.add("missing_predecessor")
-    if any(len(ids) > 1 for ids in children.values()):
+    fork_ids = set()
+    for parent, ids in children.items():
+        if len(ids) > 1:
+            fork_ids.update(ids)
+            if parent is not None:
+                fork_ids.add(parent)
+    if fork_ids:
         diagnostics.add("fork")
     if cyclic(observations, children):
         diagnostics.add("cycle")
     chain = []
     if diagnostics or any(len(values) != 1 for values in observations.values()):
-        return chain, diagnostics
+        return chain, diagnostics, fork_ids
     candidates = children.get(None, set())
     while len(candidates) == 1:
         identifier = next(iter(candidates))  # Singleton is a causal fact, not a sort winner.
         chain.append(identifier)
         candidates = children.get(identifier, set())
-    return chain, diagnostics
+    return chain, diagnostics, fork_ids
 
 
 def cyclic(observations: dict, children: dict) -> bool:
@@ -185,7 +191,8 @@ def derived_state(diagnostics: set[str], contracts: dict, chain: list[str],
 
 
 def present(state: str, diagnostics: set[str], variants: dict, sources: dict,
-            chain: list[str], board: str, task_id: str, status: str) -> dict:
+            chain: list[str], board: str, task_id: str, status: str,
+            ambiguous_ids: set[str]) -> dict:
     contracts = [values[0] for key, values in variants.items() if key.startswith("oc_") and len(values) == 1]
     latest = chain[-1] if chain and not diagnostics else None
     head = variants[latest][0] if latest else None
@@ -199,6 +206,7 @@ def present(state: str, diagnostics: set[str], variants: dict, sources: dict,
     return copy.deepcopy({
         "board": board, "task_id": task_id, "kanban_status": status, "delivery_done": status == "done",
         "state": state, "diagnostics": sorted(diagnostics), "contract": contract,
+        "ambiguous_record_ids": sorted(ambiguous_ids),
         "variants": variants, "occurrences": sources, "chain": chain if not diagnostics else [],
         "observations": [variants[identifier][0] for identifier in chain] if not diagnostics else [],
         "latest": latest, "head": head, "latest_evidence": head["evidence"] if head else [],
@@ -212,18 +220,21 @@ def reconstruct(rows: object, status: str, board: str, task_id: str,
     """Return all diagnostics and source occurrences; invalidity suppresses success."""
     admitted, diagnostics = native_rows(rows)
     if "history_limit" in diagnostics:
-        return present("invalid_history", diagnostics, {}, {}, [], board, task_id, status)
+        return present("invalid_history", diagnostics, {}, {}, [], board, task_id, status, set())
     variants, sources, errors = collect(admitted, board, task_id)
     diagnostics.update(errors)
     contracts = {key: values for key, values in variants.items() if key.startswith("oc_")}
     observations = {key: values for key, values in variants.items() if key.startswith("oo_")}
+    ambiguous_ids = {key for key, values in variants.items() if len(values) > 1}
     if len(contracts) > 1:
         diagnostics.add("multiple_contracts")
-    chain, graph_errors = topology(observations)
+        ambiguous_ids.update(contracts)
+    chain, graph_errors, fork_ids = topology(observations)
+    ambiguous_ids.update(fork_ids)
     diagnostics.update(graph_errors)
     diagnostics.update(contextual(contracts, observations, chain, status, completed_at))
     state = derived_state(diagnostics, contracts, chain, observations, status)
-    return present(state, diagnostics, variants, sources, chain, board, task_id, status)
+    return present(state, diagnostics, variants, sources, chain, board, task_id, status, ambiguous_ids)
 
 
 MAX_RESPONSE_BYTES = 32768
@@ -283,7 +294,7 @@ def base_public_view(internal: dict, conflict_count: int) -> dict:
                 observation_count=observation_count, conflict_count=conflict_count,
                 omitted={"observations": observation_count - bool(head),
                          "chain": len(internal["chain"]), "conflicts": conflict_count,
-                         "ambiguous_record_ids": len(internal["variants"]) if internal["diagnostics"] else 0},
+                         "ambiguous_record_ids": len(internal["ambiguous_record_ids"])},
                 response_budget_bytes=MAX_RESPONSE_BYTES)
     return view
 
@@ -302,8 +313,7 @@ def public_result(result: dict) -> dict:
     conflicts = {key: values for key, values in internal["variants"].items() if len(values) > 1}
     view = base_public_view(internal, len(conflicts))
     result = {**result, "view": view}
-    if internal["diagnostics"]:
-        offer(result, view, "ambiguous_record_ids", sorted(internal["variants"])[:32])
+    offer(result, view, "ambiguous_record_ids", internal["ambiguous_record_ids"][:32])
     if contract:
         offer(result, view, "contract", public_record(contract, sources))
     if head:
@@ -327,6 +337,5 @@ def public_result(result: dict) -> dict:
     view["omitted"] = {"observations": view["observation_count"] - len(view["observations"]),
                        "chain": len(internal["chain"]) - len(view["chain"]),
                        "conflicts": len(conflicts) - len(view["conflicts"]),
-                       "ambiguous_record_ids": (len(internal["variants"]) - len(view["ambiguous_record_ids"]))
-                       if internal["diagnostics"] else 0}
+                       "ambiguous_record_ids": len(internal["ambiguous_record_ids"]) - len(view["ambiguous_record_ids"])}
     return result

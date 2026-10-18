@@ -257,40 +257,26 @@ read/admission failures produce no write and do not claim a persisted mutation.
 Native calls have no proven cancellable hard timeout: never start detached retries
 or background write threads to simulate one. Failure is observational.
 
-Internal reconstruction retains complete admitted payload variants, source
-occurrences and causal history for integrity checks and exact append readback.
-All four public tools share a compact projection, including successful writes and
-identical retries. The complete JSON reply (envelope included, `ensure_ascii=False`,
-default JSON separators, UTF-8 encoded) is limited to 32,768 bytes, independently
-of reconstruction limits. No serialized JSON or persisted record is sliced.
+All four tools bound the entire UTF-8 JSON reply, including its envelope, to
+32,768 bytes (`response_budget_bytes`). Public views contain:
 
-Public views retain resolved board/task, native status/delivery fact, state/action,
-all diagnostics, timing, unique latest ID or null, and record/occurrence totals.
-Contract and latest observation are prioritized, followed by up to eight recent
-observations in causal order, the last 32 chain IDs and up to eight conflict
-summaries. Payloads are not repeated as head/latest-evidence/raw-source copies.
-When a whole payload cannot fit, its compact form retains record ID, digest, type,
-contract/predecessor/regression identity, result and observation time as applicable;
-`omitted_fields` names every payload field omitted. Contract timing remains
-available separately. The write envelope also names the acknowledged `record_id`,
-which can differ from the current latest ID for old retries.
+- Board/task, native status/delivery fact, state/action, diagnostics, timing, unique
+  `latest` ID or null, and record/observation/occurrence/conflict totals.
+- Contract and up to eight recent observations, with identity/digest retained when
+  payload detail cannot fit; `omitted_fields` names omitted payload fields.
+- Up to 32 causal `chain` IDs and eight conflict summaries, each with logical ID,
+  variant count, up to eight payload digests and an omitted-digest count.
+- Up to 32 sorted `ambiguous_record_ids`: conflicting payload IDs, fork parents
+  and children (no synthetic null parent), and competing contract IDs.
+- Per-record provenance: occurrence count, up to four author/time samples of at
+  most 512 encoded bytes each, and omitted-occurrence count. Top-level `omitted`
+  gives exact omitted observation, chain, conflict and ambiguity-ID counts.
 
-Each included record has provenance with total occurrence count, at most four
-native author/time samples, and an explicit omitted-occurrence count. Samples over
-512 encoded bytes are omitted rather than truncating attribution. Conflict summaries
-retain logical ID, variant count, up to eight sorted payload digests, omitted-digest
-count and provenance, never a selected payload. Top-level `omitted` counts describe
-missing observations, chain IDs and conflict summaries; `response_budget_bytes`
-states the bound. Detail omission is not missing persisted evidence or permission
-to select a winner. Invalid views also list up to 32 `ambiguous_record_ids` across
-the admitted records, including fork/multiple-contract identities, with an omitted
-ID count in `omitted`. This list is diagnostic context, not an accepted chain or
-contract selection. Detail omission is not permission
-to reconcile ambiguity. Inspect the native comment thread for complete evidence;
-there is no automatic fetching or new pagination protocol.
-
-Unreadable raw bodies are never returned. `write_unverified` is an operation
-acknowledgment, not a persisted outcome assessment or native lifecycle state.
+Write acknowledgments include `record_id`, which may differ from `latest` for an
+old retry. `write_unverified` describes the operation, not a persisted outcome or
+native lifecycle state. Complete admitted records remain in native comments;
+public replies omit raw bodies and never choose an ambiguous winner. Inspect that
+thread for full evidence; there is no automatic fetching or pagination protocol.
 
 ## Timing and check actions
 

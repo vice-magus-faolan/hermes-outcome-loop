@@ -37,9 +37,7 @@ plugin does not remove native comments or delivery history.
 
 ## Development
 
-Docker is the default isolated test path, not another host installation. The pinned image
-contains test dependencies; the container loads this checkout read-only. Build
-online, then run the production unit, distribution and real-Hermes tests offline:
+Build online, then run the unit, distribution and real-Hermes tests offline:
 
 ```sh
 docker build -t outcome-loop-test -f docker/Dockerfile .
@@ -50,26 +48,31 @@ timeout --signal=TERM --kill-after=10s 300s docker run --rm --init --pull=never 
   --mount type=bind,src="$PWD",dst=/source,readonly outcome-loop-test
 ```
 
-The image fetches unmodified `NousResearch/hermes-agent` at supported release
-`v0.22.2`; override with `--build-arg HERMES_REF=main` to investigate upstream drift.
-Build and native-test logs report the actual checked-out revision. CI tests the
-supported release on PRs and pushes, and both that release and upstream main weekly.
-Hermes is installed editably inside the image, as its development packaging permits;
-no core build guards are disabled.
+The image uses official `NousResearch/hermes-agent` release `v0.22.2` and its locked
+dependencies. To test upstream main, rebuild before running the same container command:
 
-With an existing supported Hermes development environment and the dependencies in
-`requirements-test.txt`, ordinary `python3 -m pytest` or `python3 scripts/verify.py` also
-work outside Docker. Set `HERMES_TEST_SOURCE` to that unmodified upstream checkout
-and `TMPDIR` to an owned writable scratch directory. Native cases remain required:
-they create and remove disposable homes/profiles/boards, discard ambient credentials
-and report missing prerequisites as errors rather than skips. No live profile is used.
+```sh
+docker build --build-arg HERMES_REF=main -t outcome-loop-test -f docker/Dockerfile .
+```
+
+Outside Docker, use an existing supported Hermes development environment:
+
+```sh
+export HERMES_TEST_SOURCE=/path/to/hermes-agent
+export TMPDIR=/path/to/owned-scratch
+mkdir -p "$TMPDIR"
+python3 -m pip install -r requirements-test.txt
+python3 -B scripts/verify.py
+```
+
+Native tests log the Hermes revision and use disposable homes, profiles and boards.
+CI tests the release on PRs and main pushes, and both release and upstream main on
+the Monday schedule or manual workflow dispatch.
 
 Build a portable directory and deterministic archive with
 `python3 scripts/package_plugin.py --output dist` (stdlib only; choose a new output
 directory for each build). Test helpers, Docker and development dependencies are
-not shipped in the plugin. `AGENTS.md` remains unchanged, including its obsolete
-bootstrap statements. Its required original brief and product-reference documents
-are retained; this cleanup removes experimental harness and recovery documentation.
+not shipped in the plugin.
 
 ## License
 

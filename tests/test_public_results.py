@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 from hermes_outcome_loop import register, history, records
 from test_outcome_adapter import Native, request, BOARD, TASK
-from test_outcome_core import load, source
+from test_outcome_core import case_rows, load, source
 
 
 class PublicResultTests(unittest.TestCase):
@@ -70,6 +70,56 @@ class PublicResultTests(unittest.TestCase):
         self.assertEqual(retry["view"]["latest"], new["observation"]["record_id"])
         self.assertEqual(len(native.state["comments"]), 98)
 
+    def test_late_fork_points_to_participants_not_unrelated_history(self):
+        for child_count in (2, 40):
+            with self.subTest(child_count=child_count):
+                rows, parent = self.large_history(40)
+                children = []
+                for index in range(child_count):
+                    value = copy.deepcopy(load("golden.json")["confirmed"])
+                    value.update(record_id=f"oo_{index + 256:032x}", predecessor=parent)
+                    children.append(value["record_id"])
+                    rows.append(source(value))
+                expected = sorted([parent, *children])
+                self.assertTrue(set(children).isdisjoint(sorted(records.decode(row["body"])["record_id"]
+                                                               for row in rows)[:32]))
+                native = Native(rows)
+                original = copy.deepcopy(native.state)
+                tools = self.handlers(native)
+                for ordered in (rows, list(reversed(rows))):
+                    native.state["comments"] = ordered
+                    for name in ("outcome_show", "outcome_check"):
+                        view = self.call(tools, name, {"board": BOARD, "task_id": TASK})["view"]
+                        self.assertEqual(view["state"], "invalid_history")
+                        self.assertEqual(view["diagnostics"], ["fork"])
+                        self.assertIsNone(view["latest"])
+                        self.assertEqual(view["chain"], [])
+                        self.assertEqual(view["observations"], [])
+                        self.assertEqual(view["conflicts"], [])
+                        self.assertEqual(view["ambiguous_record_ids"], expected[:32])
+                        self.assertEqual(view["omitted"]["ambiguous_record_ids"], len(expected) - 32
+                                         if len(expected) > 32 else 0)
+                    self.assertEqual(native.state["comments"], ordered)
+                native.state["comments"] = rows
+                self.assertEqual(native.state, original)
+
+    def test_ambiguity_pointers_use_all_variants_and_multiple_contract_ids(self):
+        for case in load("histories.json"):
+            if case["name"] not in {"multiple_contract_ids", "conflict_edge_and_fork"}:
+                continue
+            rows = case_rows(case)
+            expected = sorted({records.decode(row["body"])["record_id"] for row in rows})
+            if case["name"] == "conflict_edge_and_fork":
+                expected = [identifier for identifier in expected if identifier.startswith("oo_")]
+            native = Native(rows)
+            original = copy.deepcopy(native.state)
+            view = self.call(self.handlers(native), "outcome_show", {"board": BOARD, "task_id": TASK})["view"]
+            self.assertEqual(view["diagnostics"], case["diagnostics"])
+            self.assertEqual(view["ambiguous_record_ids"], expected)
+            self.assertEqual(view["omitted"]["ambiguous_record_ids"], 0)
+            self.assertIsNone(view["latest"])
+            self.assertEqual(native.state, original)
+
     def test_conflicting_variants_are_summarized_without_choosing_a_winner(self):
         rows = [source(load("golden.json")["contract"])]
         for index in range(80):
@@ -89,6 +139,8 @@ class PublicResultTests(unittest.TestCase):
             self.assertEqual(view["observations"], [])
             self.assertEqual(view["observation_count"], 8)
             self.assertEqual(view["omitted"]["observations"], 8)
+            self.assertEqual(view["ambiguous_record_ids"], [f"oo_{index:032x}" for index in range(8)])
+            self.assertEqual(view["omitted"]["ambiguous_record_ids"], 0)
             self.assertGreater(len(view["conflicts"]), 0)
             for conflict in view["conflicts"]:
                 self.assertEqual(conflict["variant_count"], 10)
