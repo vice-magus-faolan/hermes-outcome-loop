@@ -4,3 +4,4 @@
 !docker/Dockerfile
 !docker/debian.sources
 !requirements.txt
+!requirements-test.txt

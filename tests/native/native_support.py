@@ -12,7 +12,6 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-HERMES_SHA = "f42f579cf8bac4918ac9599bece71618afadd846"
 
 
 def require(condition: object, message: str) -> None:
@@ -57,13 +56,23 @@ def validate_paths(base: Path) -> None:
 
 def collect(debug: bool = False) -> dict:
     """Run the real registered-plugin cases with finite process/container bounds."""
-    require(Path("/.dockerenv").is_file(), "native integration must run in Docker")
     source = Path(os.environ["HERMES_TEST_SOURCE"]).resolve(strict=True)
     sha = subprocess.check_output(["git", "-C", str(source), "rev-parse", "HEAD"], text=True).strip()
-    require(sha == HERMES_SHA, "native integration requires the pinned Hermes revision")
+    print(f"Native integration Hermes revision: {sha}", file=sys.stderr, flush=True)
     with tempfile.TemporaryDirectory(prefix="outcome-native-", dir=os.environ["TMPDIR"]) as tmp:
         base = Path(tmp).resolve(strict=True)
         env = install_fixture(base, "outcome-test-a")
+        # Supported CLI creation, scoped to the same disposable environment as tests.
+        setup = subprocess.run([sys.executable, "-m", "hermes_cli.main", "kanban", "boards",
+                                "create", "outcome-test"], cwd=source, env=env,
+                               capture_output=True, text=True, timeout=40)
+        require(setup.returncode == 0, "disposable native board creation failed: " + setup.stderr)
+        for arguments in (["plugins", "validate", str(ROOT)],
+                          ["plugins", "doctor", str(ROOT), "--ci"]):
+            check = subprocess.run([sys.executable, "-m", "hermes_cli.main", *arguments],
+                                   cwd=source, env=env, capture_output=True, text=True, timeout=40)
+            print(check.stdout, file=sys.stderr, flush=True)
+            require(check.returncode == 0, "native plugin check failed: " + check.stderr)
         args = [sys.executable, "-B", str(ROOT / "tests/native/native_runtime.py"), str(source), str(base)]
         process = subprocess.Popen(args, cwd=base, env=env, text=True, stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE, start_new_session=True)
@@ -83,6 +92,4 @@ def collect(debug: bool = False) -> dict:
                 print(errors[-4096:].replace(str(base), "<disposable-root>")
                       .replace(str(source), "<hermes-source>"), file=sys.stderr)
             raise RuntimeError("production-native integration failed")
-        report = json.loads(output)
-        require(report["hermes_sha"] == HERMES_SHA, "native integration pin mismatch")
-        return report
+        return json.loads(output)

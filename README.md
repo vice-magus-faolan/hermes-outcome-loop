@@ -37,9 +37,7 @@ plugin does not remove native comments or delivery history.
 
 ## Development
 
-Tests use Docker, not another Hermes installation on the host. The pinned image
-contains test dependencies; the container loads this checkout read-only. Build
-online, then run the production unit, distribution and real-Hermes tests offline:
+Build online, then run the unit, distribution and real-Hermes tests offline:
 
 ```sh
 docker build -t outcome-loop-test -f docker/Dockerfile .
@@ -50,12 +48,31 @@ timeout --signal=TERM --kill-after=10s 300s docker run --rm --init --pull=never 
   --mount type=bind,src="$PWD",dst=/source,readonly outcome-loop-test
 ```
 
+The image uses official `NousResearch/hermes-agent` release `v0.22.2` and its locked
+dependencies. To test upstream main, rebuild before running the same container command:
+
+```sh
+docker build --build-arg HERMES_REF=main -t outcome-loop-test -f docker/Dockerfile .
+```
+
+Outside Docker, use an existing supported Hermes development environment:
+
+```sh
+export HERMES_TEST_SOURCE=/path/to/hermes-agent
+export TMPDIR=/path/to/owned-scratch
+mkdir -p "$TMPDIR"
+python3 -m pip install -r requirements-test.txt
+python3 -B scripts/verify.py
+```
+
+Native tests log the Hermes revision and use disposable homes, profiles and boards.
+CI tests the release on PRs and main pushes, and both release and upstream main on
+the Monday schedule or manual workflow dispatch.
+
 Build a portable directory and deterministic archive with
 `python3 scripts/package_plugin.py --output dist` (stdlib only; choose a new output
 directory for each build). Test helpers, Docker and development dependencies are
-not shipped in the plugin. `AGENTS.md` remains unchanged, including its obsolete
-bootstrap statements. Its required original brief and product-reference documents
-are retained; this cleanup removes experimental harness and recovery documentation.
+not shipped in the plugin.
 
 ## License
 

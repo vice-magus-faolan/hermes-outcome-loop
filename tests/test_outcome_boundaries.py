@@ -69,7 +69,8 @@ class BoundaryTests(unittest.TestCase):
             for reply in replies.values():
                 self.assertTrue(reply["ok"], reply)
                 payload = params.get("contract", params.get("observation"))
-                occurrences = reply["view"]["occurrences"][payload["record_id"]]
+                record = reply["view"]["contract"] if payload["type"] == "contract" else reply["view"]["observations"][-1]
+                occurrences = record["provenance"]["samples"]
                 self.assertEqual(len(occurrences), 2)
                 self.assertEqual({row["author"] for row in occurrences}, {"profile-a", "profile-b"})
             self.assertEqual([name for name, _ in native.calls].count("kanban_comment"), 2)

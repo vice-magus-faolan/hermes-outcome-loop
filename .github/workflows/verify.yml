@@ -3,6 +3,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 6 * * 1'
 permissions:
   contents: read
 jobs:
@@ -15,7 +18,28 @@ jobs:
         with:
           persist-credentials: false
       - name: Build pinned test dependencies
-        run: timeout --signal=TERM --kill-after=30s 1200s docker build -t outcome-loop-test -f docker/Dockerfile .
+        run: timeout --signal=TERM --kill-after=30s 1200s docker build --build-arg HERMES_REF=v0.22.2 -t outcome-loop-test -f docker/Dockerfile .
+      - name: Run product tests in an isolated container
+        run: |
+          container="outcome-loop-ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          trap 'docker rm -f "$container" >/dev/null 2>&1 || true' EXIT
+          timeout --signal=TERM --kill-after=10s 300s docker run --rm --init --pull=never \
+            --name "$container" \
+            --network=none --read-only --cap-drop=ALL --security-opt=no-new-privileges \
+            --user=65532:65532 --cpus=2 --memory=2g --memory-swap=2g --pids-limit=256 \
+            --tmpfs /scratch:rw,exec,nosuid,nodev,size=1g,mode=1777 \
+            --mount type=bind,src="$PWD",dst=/source,readonly outcome-loop-test
+  upstream-main-verify:
+    name: upstream-main-verify
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Build upstream-main test dependencies
+        run: timeout --signal=TERM --kill-after=30s 1200s docker build --build-arg HERMES_REF=main -t outcome-loop-test -f docker/Dockerfile .
       - name: Run product tests in an isolated container
         run: |
           container="outcome-loop-ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"

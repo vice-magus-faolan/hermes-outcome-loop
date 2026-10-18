@@ -6,9 +6,9 @@ JSON schemas together. Registration exposes four tools in toolset `outcome`,
 with no hook or privileged override. Runtime dependencies are declared in the
 manifest: `jsonschema==4.25.1` and `referencing==0.37.0`.
 
-The native integration tests target Hermes revision
-`f42f579cf8bac4918ac9599bece71618afadd846` on Linux/Python 3.14. Other revisions and
-operating systems are unverified. Test source registration is distinct from live
+The native integration tests target official Hermes release `v0.22.2` on
+Linux/Python 3.14, with weekly upstream-main compatibility checks. Test logs report
+the actual revision; other operating systems are unverified. Test source registration is distinct from live
 installation, dependency admission and tool visibility in an existing session.
 
 ## Build

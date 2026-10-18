@@ -257,11 +257,26 @@ read/admission failures produce no write and do not claim a persisted mutation.
 Native calls have no proven cancellable hard timeout: never start detached retries
 or background write threads to simulate one. Failure is observational.
 
-Views return resolved board/task, native status/delivery fact, immutable contract,
-causal observation history, all valid native occurrences, unique head or null,
-diagnostics, derived state, timing and action/suggestion. Unreadable raw bodies are
-not copied into views. `write_unverified` is an operation acknowledgment, not a
-persisted outcome assessment or a native lifecycle state.
+All four tools bound the entire UTF-8 JSON reply, including its envelope, to
+32,768 bytes (`response_budget_bytes`). Public views contain:
+
+- Board/task, native status/delivery fact, state/action, diagnostics, timing, unique
+  `latest` ID or null, and record/observation/occurrence/conflict totals.
+- Contract and up to eight recent observations, with identity/digest retained when
+  payload detail cannot fit; `omitted_fields` names omitted payload fields.
+- Up to 32 causal `chain` IDs and eight conflict summaries, each with logical ID,
+  variant count, up to eight payload digests and an omitted-digest count.
+- Up to 32 sorted `ambiguous_record_ids`: conflicting payload IDs, fork parents
+  and children (no synthetic null parent), and competing contract IDs.
+- Per-record provenance: occurrence count, up to four author/time samples of at
+  most 512 encoded bytes each, and omitted-occurrence count. Top-level `omitted`
+  gives exact omitted observation, chain, conflict and ambiguity-ID counts.
+
+Write acknowledgments include `record_id`, which may differ from `latest` for an
+old retry. `write_unverified` describes the operation, not a persisted outcome or
+native lifecycle state. Complete admitted records remain in native comments;
+public replies omit raw bodies and never choose an ambiguous winner. Inspect that
+thread for full evidence; there is no automatic fetching or pagination protocol.
 
 ## Timing and check actions
 

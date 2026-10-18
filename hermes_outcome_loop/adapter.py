@@ -247,13 +247,18 @@ class OutcomeAdapter:
                 return failure("write_unverified", True, ["readback_mismatch"])
             if view["variants"].get(record["record_id"]) != [record]:
                 return failure("write_unverified", True, ["readback_mismatch"])
-            return {"ok": True, "acknowledgment": "verified", "may_have_persisted": True, "view": view}
+            return {"ok": True, "acknowledgment": "verified", "record_id": record["record_id"],
+                    "may_have_persisted": True, "view": view}
         except OutcomeError as error:
             return failure("write_unverified", True, [str(error)])
         except Exception:
             return failure("write_unverified", True, ["operation_failure"])
 
     def invoke(self, name: str, params: object) -> dict:
+        """One shared bounded projection for all reads, writes and identical retries."""
+        return history.public_result(self.perform(name, params))
+
+    def perform(self, name: str, params: object) -> dict:
         """Safe tool result; rejected/native error details never reach callers."""
         try:
             board, task_id, anchors, record = inputs(name, params, self.environment)
@@ -262,7 +267,8 @@ class OutcomeAdapter:
                 return {"ok": True, "view": view}
             admission = preflight(record, reply, view, completed)
             if admission == "identical_retry":
-                return {"ok": True, "acknowledgment": admission, "may_have_persisted": False, "view": view}
+                return {"ok": True, "acknowledgment": admission, "record_id": record["record_id"],
+                        "may_have_persisted": False, "view": view}
             return self.append(record, anchors)
         except OutcomeError as error:
             return failure(str(error))

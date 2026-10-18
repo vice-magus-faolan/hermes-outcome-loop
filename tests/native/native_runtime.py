@@ -11,7 +11,7 @@ from pathlib import Path
 import subprocess
 import sys
 
-from native_support import ROOT, install_fixture, validate_paths, require, HERMES_SHA
+from native_support import ROOT, install_fixture, validate_paths, require
 from native_snapshot import snapshot, preserved
 
 
@@ -151,7 +151,7 @@ def main() -> None:
         print(json.dumps(fresh_action(api, sys.argv[3], sys.argv[4], json.loads(sys.argv[5]))))
         return
     from native_cases import failure_cases, race_cases
-    report = {"hermes_sha": HERMES_SHA, **delivered_cases(api), **failure_cases(api), **race_cases(api)}
+    report = {**delivered_cases(api), **failure_cases(api), **race_cases(api)}
     require(not api.manager.has_hook("kanban_task_completed"), "test loader unexpectedly registered completion hook")
     report["no_completion_hook_dependency"] = True
     print(json.dumps(report, sort_keys=True))
