@@ -169,6 +169,8 @@ class ReconstructionTests(unittest.TestCase):
     def test_completion_timestamp_and_required_baseline(self):
         golden = load("golden.json")
         rows = [source(golden["contract"]), source(golden["confirmed"])]
+        # Persisted after the current delivery, not an unattributed historical append.
+        rows[1]["created_at"] = 1791072000
         view = history.reconstruct(rows, "done", "sample-board", "sample-root", completed_at="2026-10-03T00:00:00Z")
         self.assertIn("invalid_evidence", view["diagnostics"])
         contract = copy.deepcopy(golden["contract"])

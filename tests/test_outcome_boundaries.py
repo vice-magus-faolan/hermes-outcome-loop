@@ -132,7 +132,10 @@ class BoundaryTests(unittest.TestCase):
             self.assertFalse(result["may_have_persisted"])
             self.assertNotIn("synthetic-sensitive-detail", json.dumps(result))
         native = Native([source(load("golden.json")["contract"])])
-        native.after = lambda n: n.state["task"].update(completed_at=1791072000)
+        def later_delivery(native):
+            native.state["task"].update(completed_at=1791072000)
+            native.state["comments"][-1]["created_at"] = 1791072000
+        native.after = later_delivery
         result = adapter(native).invoke("outcome_observe", request("confirmed"))
         self.assertEqual(result["error"], "write_unverified")
         self.assertIn("invalid_evidence", result["diagnostics"])

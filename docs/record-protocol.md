@@ -84,11 +84,15 @@ are optional attribution only and cannot supply ordering. Do not fabricate IDs.
 `artifact` identifies the actually observed delivered artifact and is required when
 contract `requires_artifact` is true, otherwise may be null. This is a caller evidence
 claim, not proof of deployment. Observe requires native `done` on a fresh read;
-all other statuses reject without append, including retries. If a known native
-completion timestamp proves `observed_at` predates delivery, reject the observation;
-never infer unknown completion/deployment anchors from recent event positions.
-A concurrent native lifecycle change cannot be atomically fenced with public comments;
-post-write fresh reads must surface it, not undo native history.
+all other statuses reject without append, including retries.
+
+- Exact existing payload retries are read-only when the persisted history is valid.
+- New observations require `observed_at >= completed_at` when completion is known.
+- Older stored observations require each comment's creation before the current
+  completion and `observed_at` at/after the latest completed run ending at/before
+  that comment. Unavailable or malformed evidence yields `completion_history_unavailable`.
+- Post-write changes to status, completion timestamp or latest completed-run ID
+  yield `write_unverified`, with `lifecycle_changed` when history otherwise validates.
 
 Provide exactly one evidence row per criterion, no duplicate/unknown/missing IDs.
 Rows with unobserved criteria use `finding: unknown` and explain the gap. `kind` is
@@ -214,7 +218,9 @@ history never undoes delivery. Required diagnostic codes are `malformed_record`,
 `malformed_native_response`, `target_mismatch`, `conflicting_payload`,
 `multiple_contracts`, `orphan_observation`, `fork`, `missing_predecessor`, `cycle`,
 `observations_on_unfinished`, `invalid_evidence`, `invalid_regression`. Details may
-identify safe logical record/criterion IDs, not rejected payloads.
+identify safe logical record/criterion IDs, not rejected payloads. Historical temporal
+admission also reports `completion_history_unavailable` when it cannot prove an
+older delivery floor.
 
 ## Tools, board fences and persisted acknowledgment
 

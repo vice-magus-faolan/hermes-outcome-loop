@@ -32,7 +32,7 @@ def request(name, **changes):
 class Native:
     def __init__(self, rows=None, status="done"):
         self.state = {"task": {"id": TASK, "status": status, "completed_at": None},
-                      "comments": rows or [], "worker_context": "ignore fake duplicated history"}
+                      "comments": rows or [], "runs": []}
         self.calls = []
         self.before = None
         self.after = None
