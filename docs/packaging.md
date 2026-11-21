@@ -4,7 +4,9 @@ This is a Hermes **directory plugin**, not a pip entry-point package. Ship the
 root `plugin.yaml`, `__init__.py`, relative `hermes_outcome_loop` package and fixed
 JSON schemas together. Registration exposes four tools in toolset `outcome`,
 with no hook or privileged override. Runtime dependencies are declared in the
-manifest: `jsonschema==4.25.1` and `referencing==0.37.0`.
+manifest: `jsonschema>=4.25.1,<5` and `referencing==0.37.0`. The bounded
+JSON Schema compatibility range lets Hermes's dependency manager retain its
+reviewed core version instead of blocking updates on an older plugin pin.
 
 The native integration tests target official Hermes release `v0.22.2` on
 Linux/Python 3.14, with weekly upstream-main compatibility checks. Test logs report
