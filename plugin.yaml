@@ -11,5 +11,5 @@ provides_tools: [outcome_define, outcome_show, outcome_observe, outcome_check]
 provides_hooks: []
 capabilities: []
 python_dependencies:
-  - jsonschema==4.25.1
+  - jsonschema>=4.25.1,<5
   - referencing==0.37.0
